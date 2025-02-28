@@ -1,0 +1,454 @@
+---
+title: "work_flow"
+author: "Adam A. Bramlett"
+date: "2025-01-29"
+output: html_document
+---
+
+---
+title: "et_clean_check"
+author: "Adam A. Bramlett"
+date: "2024-08-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(xml2)
+library(dplyr)
+library(readr)
+library(tidyr)
+library(tidyverse)
+library(tidyverse)
+library(ggExtra)
+library(ggridges)
+library(gghalves)
+library(psycho)
+library(GGally)
+library(corrplot)
+```
+
+```{r}
+base_path<-"/Users/adambramlett/scripts/music_project_23"
+master_path<-"/Users/adambramlett/scripts/music_project_23/data"
+list.files(file.path(master_path,"rds_folder"))
+data_list <- readRDS(file.path(master_path,"rds_folder","all_experiments_combined_list.rds"))
+et_data_list <- readRDS(file.path(master_path,"rds_folder","all_et_data_list.rds"))
+project<-"data_exp_141883-v12"
+version <- sub("data_exp_", "", project)
+file_path<-file.path(master_path,project)
+
+```
+
+```{r}
+mapping<-read.csv("../../FoCr/experiment/mapping.csv")
+mapping_audio<-read.csv("../../FoCr/experiment/mapping_audio.csv")
+time_course<-read.csv("../data/time_course.csv")
+```
+
+```{r}
+
+#creating the cleaned and empty rdf
+df_list_names <- names(data_list)
+
+# Create a new list with empty dataframes
+empty_dataframes_list <- lapply(df_list_names, function(name) data.frame())
+# Set the names of the new list
+names(empty_dataframes_list) <- df_list_names
+#cleaned data
+cleaned_data_list<-empty_dataframes_list
+cleaned_data_list
+```
+
+
+```{r}
+ge_list_1_data<-data_list$Ge_et_al_task_ET_list_1
+ge_list_2_data<-data_list$Ge_et_al_task_ET_list_2
+
+ge_list_data<-ge_list_1_data%>%
+  rbind(ge_list_2_data)%>%
+  filter(experiment!="data_exp_142778-v2")
+
+View(ge_list_data)
+
+ge_list_1_et_data<-et_data_list$Ge_et_al_task_ET_list_1
+ge_list_2_et_data<-et_data_list$Ge_et_al_task_ET_list_2
+```
+
+```{r}
+ge_list_data_c<-ge_list_data%>%
+  rename_with(tolower)%>%
+  select(participant.private.id,screen.name,spreadsheet,task.name,spreadsheet.row,task,response,zone.type,zone.name,visual,audio,display)%>%
+  filter(zone.type=="content_web_audio")%>%
+  filter(response=="AUDIO PLAY REQUESTED")%>%
+  filter(display  != "practice")%>%
+  mutate(object = gsub(".mp3", "", audio))%>%
+  mutate(filler = ifelse(substr(object, 1, 1) == "f", 1, 0))%>%
+  mutate(condition = case_when(
+    grepl("b", audio) ~ "b",
+    grepl("a", audio) ~ "a",
+    TRUE ~ NA_character_
+  ))%>%
+  mutate(participant.private.id = as.character(participant.private.id))%>%
+  mutate(spreadsheet.row = as.double(spreadsheet.row))
+
+
+ge_et_data<-ge_list_1_et_data%>%
+  rbind(ge_list_2_et_data)%>%
+  mutate(participant.private.id=participant_id,
+         spreadsheet.row=spreadsheet_row)%>%
+  select(participant.private.id,spreadsheet.row,screen_index,time_stamp,type,
+         face_conf,x_pred_normalised,y_pred_normalised)%>%
+  filter(type=="prediction")%>%
+  group_by(participant.private.id,spreadsheet.row)%>%
+  mutate(time=time_stamp-min(time_stamp))%>%
+  filter(face_conf==1)%>%
+  mutate(participant.private.id = as.character(participant.private.id))%>%
+  mutate(spreadsheet.row = as.double(spreadsheet.row))
+```
+
+```{r}
+ge_data<-ge_list_data_c%>%
+  left_join(ge_et_data)%>%
+  mutate(time_rounded = round(time / 500) * 500) %>%
+  mutate(x_pred_normalised = x_pred_normalised - 0.5,
+         y_pred_normalised = y_pred_normalised - 0.5) %>%
+  filter(x_pred_normalised > -0.5 & x_pred_normalised < 0.5 &
+         y_pred_normalised > -0.5 & y_pred_normalised < 0.5) %>%
+  mutate(quadrant = case_when(
+           x_pred_normalised < 0 & y_pred_normalised > 0 ~ "1",
+           x_pred_normalised >= 0 & y_pred_normalised > 0 ~ "2",
+           x_pred_normalised < 0 & y_pred_normalised <= 0 ~ "4",
+           x_pred_normalised >= 0 & y_pred_normalised <= 0 ~ "3" ))
+
+
+ge_data%>%ggplot(aes(x=x_pred_normalised,y=y_pred_normalised,color=quadrant))+
+  geom_point()
+```
+
+```{r}
+library(stringr)
+time_course_cleaned <- time_course %>%
+  mutate(time_cats=sapply(str_split(sound_names, "_"), 
+                          function(x) tail(x, 1)),
+         audio=sapply(str_split(sound_names, "_"), 
+                      function(x) paste(head(x, 1), collapse = "_")))%>%
+  select(-sound_names)%>%
+  mutate(start_times=start_times*1000,
+         end_times=end_times*1000)%>%
+  pivot_wider(names_from = time_cats,
+              values_from = c(start_times, end_times))
+
+mapping_audio_cleaned<-mapping_audio%>%
+  right_join(time_course_cleaned)%>%
+  mutate(audio=paste(audio,".wav",sep=""))
+View(time_course)
+
+ge_data_mapped<-ge_data%>%
+  right_join(mapping)%>%
+  right_join(mapping_audio_cleaned)%>%
+  mutate(
+    target = case_when(
+      str_detect(upper_left, target_verb) & str_detect(upper_left, target_object) ~ 1,
+      str_detect(upper_right, target_verb) & str_detect(upper_right, target_object) ~ 2,
+      str_detect(lower_right, target_verb) & str_detect(lower_right, target_object) ~ 3,
+      str_detect(lower_left, target_verb) & str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    verb_comp = case_when(
+      !str_detect(upper_left, target_verb) & str_detect(upper_left, target_object) ~ 1,
+      !str_detect(upper_right, target_verb) & str_detect(upper_right, target_object) ~ 2,
+      !str_detect(lower_right, target_verb) & str_detect(lower_right, target_object) ~ 3,
+      !str_detect(lower_left, target_verb) & str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    object_comp = case_when(
+      str_detect(upper_left, target_verb) & !str_detect(upper_left, target_object) ~ 1,
+      str_detect(upper_right, target_verb) & !str_detect(upper_right, target_object) ~ 2,
+      str_detect(lower_right, target_verb) & !str_detect(lower_right, target_object) ~ 3,
+      str_detect(lower_left, target_verb) & !str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    dist = case_when(
+      !str_detect(upper_left, target_verb) & !str_detect(upper_left, target_object) ~ 1,
+      !str_detect(upper_right, target_verb) & !str_detect(upper_right, target_object) ~ 2,
+      !str_detect(lower_right, target_verb) & !str_detect(lower_right, target_object) ~ 3,
+      !str_detect(lower_left, target_verb) & !str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_))
+
+
+ge_data_mapped_clean<-ge_data_mapped%>%  
+  mutate(target_looks=ifelse(quadrant==target,1,0),
+         obj_comp_looks=ifelse(quadrant==object_comp,1,0),
+         verb_comp_looks=ifelse(quadrant==verb_comp,1,0),
+         dist_looks=ifelse(quadrant==dist,1,0))%>%
+  mutate(
+    time=time-200,#launch secade
+    time=time-10,#gorilla play delay
+    time_cats = case_when(
+      time < start_times_1 ~ 0,
+      time > start_times_1 & time <= end_times_1 ~ 1,
+      time > start_times_2 & time <= end_times_2 ~ 2,
+      time > start_times_3 & time <= end_times_3 ~ 3,
+      time > start_times_4 & time <= end_times_4 ~ 4,
+      time > start_times_5 & time <= end_times_5 ~ 5,
+      time > start_times_6 & time <= end_times_6 ~ 6,
+      time > start_times_7 & time <= end_times_7 ~ 7,
+      time > start_times_8 & time <= end_times_8 ~ 8,
+      time > start_times_9 & time <= end_times_9 ~ 9,
+      time > start_times_10 & time <= end_times_10 ~ 10,
+      time > start_times_11 & time <= end_times_11 ~ 11,
+      time > end_times_1 ~ 12,
+      TRUE ~ NA_real_))%>%
+  filter(time_cats>-1,
+         time<start_times_11+500)%>%
+  mutate(
+    condition = case_when(
+      condition == "a" ~ "object_stressed", 
+      condition == "b" ~ "verb_stressed",  
+      TRUE ~ NA_character_))%>%
+  mutate(
+    time_cats_words = case_when(
+      time_cats == 0 ~ "   b3tin  ",
+      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 2 ~ "only",
+      time_cats == 3 ~ "verb1",
+      time_cats == 4 ~ "the1",
+      time_cats == 5 ~ "object1",
+      time_cats == 6 ~ "  ",
+      time_cats == 7 ~ "not",
+      time_cats == 8 ~ "verb2",
+      time_cats == 9 ~ "the2",
+      time_cats == 10 ~ "object2",
+      time_cats == 11 ~ " ",
+      time_cats == 12 ~ " ",
+      TRUE ~ NA_character_),
+    time_cats_words = factor(time_cats_words, levels = unique(time_cats_words)))
+  
+View( ge_data_mapped_clean)
+fixation_proportions <- ge_data_mapped_clean %>%
+  group_by(condition, time_cats_words) %>%
+  summarize(
+    mean_target_looks = mean(target_looks),
+    mean_obj_comp_looks = mean(obj_comp_looks),
+    mean_verb_comp_looks = mean(verb_comp_looks),
+    mean_dist_looks = mean(dist_looks),
+    se_target_looks = sd(target_looks) / sqrt(n()),
+    se_obj_comp_looks = sd(obj_comp_looks) / sqrt(n()),
+    se_verb_comp_looks = sd(verb_comp_looks) / sqrt(n()),
+    se_dist_looks = sd(dist_looks) / sqrt(n())
+  ) %>%
+  # Pivot both mean and SE together in one step
+  pivot_longer(
+    cols = c(starts_with("mean_"), starts_with("se_")),
+    names_to = c("type", "category"),
+    names_sep = "_",
+    values_to = "value"
+  )%>%
+  pivot_wider(values_from = value,
+              names_from = type)%>%
+  mutate(fixation_proportion=mean)
+
+# You can now use `se_fixation_proportion` in your plot:
+fixation_proportions %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition))) +
+  geom_point() +
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_wrap(category ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+fixation_proportions %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category))) +
+  geom_point() +
+  geom_smooth()+
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_wrap(condition ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+```{r}
+
+fixation_proportions3 <- ge_data_mapped_clean %>%
+  group_by(condition, time_cats_words,participant.private.id) %>%
+  summarize(
+    mean_target_looks = mean(target_looks),
+    mean_obj_comp_looks = mean(obj_comp_looks),
+    mean_verb_comp_looks = mean(verb_comp_looks),
+    mean_dist_looks = mean(dist_looks)
+  ) %>%
+  pivot_longer(
+    cols = starts_with("mean_"),
+    names_to = "category",
+    values_to = "fixation_proportion"
+  ) %>%
+  mutate(
+    category = str_replace(category, "mean_", "")
+  )
+
+# You can now use `se_fixation_proportion` in your plot:
+fixation_proportions3 %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,participant.private.id))) +
+  geom_point() +
+  geom_line(alpha = .25) +
+  facet_wrap(category ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+
+
+```
+
+```{r}
+fixation_proportions2 <- ge_data_mapped_clean %>%
+  group_by(audio,participant.private.id,time_cats_words,time_rounded)%>%
+  mutate(norm_time=time-min(time),
+         norm_time=round(norm_time/400)*400)%>%
+  ungroup()%>%
+  group_by(condition,time_rounded) %>%
+  summarize(
+    mean_target_looks = mean(target_looks),
+    mean_obj_comp_looks = mean(obj_comp_looks),
+    mean_verb_comp_looks = mean(verb_comp_looks),
+    mean_dist_looks = mean(dist_looks),
+    se_target_looks = sd(target_looks) / sqrt(n()),
+    se_obj_comp_looks = sd(obj_comp_looks) / sqrt(n()),
+    se_verb_comp_looks = sd(verb_comp_looks) / sqrt(n()),
+    se_dist_looks = sd(dist_looks) / sqrt(n())
+  ) %>%
+  pivot_longer(
+    cols = starts_with("mean_"),
+    names_to = "category",
+    values_to = "fixation_proportion"
+  ) %>%
+  pivot_longer(
+    cols = starts_with("se_"),
+    names_to = "se_category",
+    values_to = "se_fixation_proportion"
+  ) %>%
+  mutate(
+    category = str_replace(category, "mean_", ""),
+    se_category = str_replace(se_category, "se_", "")
+  )
+
+# You can now use `se_fixation_proportion` in your plot:
+fixation_proportions2 %>%
+  ggplot(aes(x = time_rounded, y = fixation_proportion, color = condition, group = interaction(condition,participant.private.id))) +
+  geom_point() +
+  geom_line(alpha = .25) +
+  facet_grid(category ~ .,scales="free_x") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+fixation_proportions2 %>%
+  ggplot(aes(x = time_rounded, y = fixation_proportion, color = category, group = interaction(category))) +
+  geom_point() +
+  geom_line(alpha = .25) +
+  facet_wrap(condition ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+```
+
+
+```{r}
+fixation_proportions%>%ggplot(aes(x=time_rounded,y=fixation_proportion,color=condition))+
+  geom_point()+
+  facet_wrap(category~.)
+
+fixation_proportions%>%ggplot(aes(x=time_cats,y=fixation_proportion,color=condition))+
+  geom_smooth()+
+  facet_wrap(category~.)
+
+```
+```{r}
+
+mapping<-mapping%>%
+  mutate(
+    verb_comp = case_when(
+      str_detect(upper_left, target_verb) & str_detect(upper_left, target_object) ~ 1,
+      str_detect(upper_right, target_verb) & str_detect(upper_right, target_object) ~ 2,
+      str_detect(lower_right, target_verb) & str_detect(lower_right, target_object) ~ 3,
+      str_detect(lower_left, target_verb) & str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    dist = case_when(
+      !str_detect(upper_left, target_verb) & str_detect(upper_left, target_object) ~ 1,
+      !str_detect(upper_right, target_verb) & str_detect(upper_right, target_object) ~ 2,
+      !str_detect(lower_right, target_verb) & str_detect(lower_right, target_object) ~ 3,
+      !str_detect(lower_left, target_verb) & str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    target = case_when(
+      str_detect(upper_left, target_verb) & !str_detect(upper_left, target_object) ~ 1,
+      str_detect(upper_right, target_verb) & !str_detect(upper_right, target_object) ~ 2,
+      str_detect(lower_right, target_verb) & !str_detect(lower_right, target_object) ~ 3,
+      str_detect(lower_left, target_verb) & !str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    object_comp = case_when(
+      !str_detect(upper_left, target_verb) & !str_detect(upper_left, target_object) ~ 1,
+      !str_detect(upper_right, target_verb) & !str_detect(upper_right, target_object) ~ 2,
+      !str_detect(lower_right, target_verb) & !str_detect(lower_right, target_object) ~ 3,
+      !str_detect(lower_left, target_verb) & !str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    )
+  )
+
+ge_data_mapped<-ge_data%>%
+  right_join(mapping)%>%
+  mutate(target_looks=ifelse(quadrant==target,1,0),
+         obj_comp_looks=ifelse(quadrant==object_comp,1,0),
+         verb_comp_looks=ifelse(quadrant==verb_comp,1,0),
+         dist_looks=ifelse(quadrant==dist,1,0))%>%
+  na.omit()
+  
+  
+fixation_proportions<-ge_data_mapped%>%
+  group_by(time_rounded,condition)%>%
+  summarize(mean_target_looks=mean(target_looks),
+            mean_obj_comp_looks=mean(obj_comp_looks),
+            mean_verb_comp_looks=mean(verb_comp_looks),
+            mean_dist_looks=mean(dist_looks))%>%
+  pivot_longer(
+    cols = starts_with("mean_"),
+    names_to = "category",
+    values_to = "fixation_proportion")%>%
+  mutate(category = str_replace(category, "mean_", ""))%>%
+  mutate(time_rounded=time_rounded-200)%>%
+  filter(time_rounded>8000&time_rounded<14600)
+
+#ge_data%>%ggplot(aes(x=x_pred_normalised,y=y_pred_normalised,color=quadrant))+
+#  geom_point()
+
+fixation_proportions%>%ggplot(aes(x=time_rounded,y=fixation_proportion,color=condition))+
+  geom_point()+
+  facet_wrap(category~.)
+
+fixation_proportions%>%ggplot(aes(x=time_rounded,y=fixation_proportion,color=condition))+
+  geom_smooth()+
+  facet_wrap(category~.)
+
+
+
+
+```
+
+
+```{r}
+View(ge_data)
+
+ge_data_spag<-ge_data%>%
+  group_by(time_rounded,quadrant, condition,filler,audio)%>%
+  
+
+```

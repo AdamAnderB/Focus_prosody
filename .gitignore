@@ -1,0 +1,20 @@
+# Ignore R and RStudio temporary files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Ignore R Data temp files
+.RDataTmp
+.RDataTmp1
+.RDataTmp2
+.RDataTmp3
+
+# Ignore project files
+Focus_prosody.Rproj
+
+# Ignore script-generated files
+python_parselmouth_functions.py
+r_parselmouth_functions.R
+temp_audio.wav
+ddm_output_1.rds

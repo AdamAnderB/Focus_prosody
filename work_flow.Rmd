@@ -1,0 +1,2059 @@
+---
+title: "work_flow"
+author: "Adam A. Bramlett"
+date: "2025-01-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(xml2)
+library(dplyr)
+library(readr)
+library(tidyr)
+library(tidyverse)
+library(tidyverse)
+library(ggExtra)
+library(ggridges)
+library(gghalves)
+library(psycho)
+library(GGally)
+library(corrplot)
+library(ltm)
+library(tidyr)
+library(conflicted)
+library(psych)
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::filter)
+```
+
+```{r}
+#English pull
+base_path<-"/Users/adambramlett/scripts/music_project_23"
+master_path<-"/Users/adambramlett/scripts/music_project_23/data"
+list.files(file.path(master_path,"rds_folder"))
+data_list <- readRDS(file.path(master_path,"rds_folder","all_experiments_combined_list_with_dutch.rds"))
+et_data_list <- readRDS(file.path(master_path,"rds_folder","all_et_data_list_with_dutch.rds"))
+project<-"data_exp_141883-v12"
+version <- sub("data_exp_", "", project)
+file_path<-file.path(master_path,project)
+```
+
+```{r}
+rhythm_file<-file.path(base_path,"experimental/build_on_gorilla/rhythm_memory/rhythm_memory.html")
+#rhythm_key<-read.csv(file.path(base_path,"data","workflow_data","rhythm_key.csv"))
+#melody key
+melody_file<-file.path(base_path,"experimental/build_on_gorilla/melody_memory/melody_memory.html")
+```
+
+```{r}
+mapping<-read.csv("../../FoCr/experiment/mapping.csv")
+mapping_audio<-read.csv("../../FoCr/experiment/mapping_audio.csv")
+time_course<-read.csv("../data/time_course.csv")
+```
+
+```{r}
+check_kept_participants <- function(existing_df = NULL, main_df = NULL, ...) {
+  # Ensure main_df or existing_df is provided
+  if (is.null(existing_df) && is.null(main_df)) {
+    stop("Either 'existing_df' or 'main_df' must be provided.")
+  }
+  
+  # If no existing_df is given, initialize with participant IDs from main_df
+  if (is.null(existing_df)) {
+    if (!"participant.private.id" %in% names(main_df)) {
+      stop("'participant.private.id' column is missing from main_df")
+    }
+    
+    existing_df <- main_df %>%
+      select(participant.private.id) %>%
+      distinct()
+  }
+  
+  datasets <- list(...)
+  dataset_names <- as.character(substitute(list(...)))[-1]  # Capture names correctly
+  
+  for (i in seq_along(datasets)) {
+    df <- datasets[[i]]
+    
+    # Ensure dataset has the necessary column
+    if (!"participant.private.id" %in% names(df)) {
+      warning(paste("Skipping dataset:", dataset_names[i], " - Missing 'participant.private.id' column."))
+      next
+    }
+    
+    col_name <- dataset_names[i]
+    existing_df[[col_name]] <- ifelse(existing_df$participant.private.id %in% df$participant.private.id, 1, 0)
+  }
+  
+  return(existing_df)
+}
+
+#for tracking chronbachs alpha
+track_cronbach_alpha <- function(existing_df = NULL, ...) {
+  datasets <- list(...)
+  dataset_names <- sapply(substitute(list(...))[-1], deparse)  # Capture variable names
+  
+  # Create a dataframe with the task names and Cronbach's alpha values
+  new_data <- data.frame(
+    Task = dataset_names,
+    Cronbachs_Alpha = unlist(datasets),  # Extract alpha values
+    stringsAsFactors = FALSE
+  )
+  
+  # Append to existing dataframe
+  if (is.null(existing_df)) {
+    return(new_data)
+  } else {
+    return(bind_rows(existing_df, new_data))
+  }
+}
+```
+
+```{r}
+
+language_questionnaire<-data_list$Language_experience_questionnaire
+lang_quest<-language_questionnaire
+
+lang_quest<-lang_quest%>%
+  rename_with(tolower)%>%
+  select(participant.private.id,question,object.name,
+         object.number,object.id,response.type,key,response)%>%
+  filter(response!="BEGIN"&response!="END",key != "quantised")%>%
+  mutate_all(~gsub('-', "_", .))%>%
+  mutate_all(~gsub('-', "_", .))%>%
+  mutate_all(~gsub('Mandarin Chinese', "Mandarin", .))%>%
+  mutate_all(~gsub('Chinese', "Mandarin", .))
+
+part_keep_rem<-check_kept_participants(main_df = lang_quest%>%ungroup())
+
+basic_background<-lang_quest%>%
+  filter(object.name=="age"|
+         object.name=="gender"|
+         object.name=="education"|
+         object.name=="mother_education"|
+         object.name=="father_education"|
+         object.name=="number_of_langs")%>%
+  select(participant.private.id,object.name,response)%>%
+  pivot_wider(names_from = object.name,values_from = response)%>%
+  mutate_all(~gsub('c\\("__other", "', "", .))%>%
+  mutate_all(~gsub('"\\)', "", .))%>%
+  mutate_all(~gsub(' languages', "", .))%>%
+  mutate_all(~gsub(' language', "", .))%>%
+  mutate_all(~gsub('Graduate _ ', "", .))%>%
+  mutate_all(~gsub('College _ ', "", .))
+
+linguistic_background<-lang_quest%>%
+  filter(object.name!="age"&
+         object.name!="gender"&
+         object.name!="education"&
+         object.name!="mother_education"&
+         object.name!="father_education"&
+         object.name!="number_of_langs")%>%
+  select(participant.private.id,object.name,response)
+  
+dom_acqu<-linguistic_background%>%
+  filter(grepl("order", object.name, ignore.case = TRUE))%>%
+  mutate(first_char = substr(object.name, 1, 1),
+         rest_of_name = substr(object.name, 2, nchar(object.name)))%>%
+  group_by(participant.private.id,rest_of_name) %>%
+  mutate(item_count = row_number(),
+         item=paste(rest_of_name,"_",item_count,sep = ""))%>%
+  ungroup()%>%
+  select(participant.private.id, item,response)%>%
+  pivot_wider(names_from = item, values_from=response)
+
+dom_acqu <- dom_acqu %>%
+  rowwise() %>%
+  select(participant.private.id, order(names(.)))%>%
+  mutate(list_o_all_langs = paste(c_across(2:(ncol(dom_acqu)-1)), collapse = ","))
+
+ordering_lang<-linguistic_background%>%
+  filter(!grepl("order", object.name, ignore.case = TRUE))%>%
+  pivot_wider(names_from = object.name, values_from=response)%>%
+  mutate(language1=paste(language1,`1lang_english_check`,sep=""))%>%
+  mutate_all(~gsub('NA', "", .))
+
+
+lang_back<-basic_background%>%
+  left_join(dom_acqu)%>%
+  left_join(ordering_lang)%>%
+  mutate(monolingual=if_else(is.na(`1lang_english_check`),0,1))%>%
+  select(!`1lang_english_check`)%>%
+  mutate(first_lang_is_lang=if_else(language1 ==lang_acquisition_order_1,1,0),
+         second_lang_is_lang=if_else(language2 ==lang_acquisition_order_2,1,0),
+         first_dom_is_lang=if_else(language1 ==lang_dominance_order_1,1,0),
+         second_dom_is_lang=if_else(language2 ==lang_dominance_order_2,1,0))%>%
+  mutate(lang_acquisition_order_1=if_else(monolingual==1,language1,lang_acquisition_order_1),
+         lang_dominance_order_1=if_else(monolingual==1,language1,lang_dominance_order_1))%>%
+  mutate(lang_acquisition_order_2=if_else(monolingual==1,"none",lang_acquisition_order_2),
+         lang_dominance_order_2=if_else(monolingual==1,"none",lang_dominance_order_2))
+
+lang_back_simple<-lang_back%>%
+  select(experiment,participant.private.id,age,education,lang_acquisition_order_1,lang_dominance_order_1,list_o_all_langs,gender, number_of_langs,mother_education,father_education )%>%
+  mutate(exp=if_else(experiment=="data_exp_213779-v3","dutch","english"),
+         lang_acquisition_order_1 = str_to_lower(lang_acquisition_order_1),
+         lang_dominance_order_1 = str_to_lower(lang_dominance_order_1))
+
+lang_back_keep<-lang_back_simple%>%
+  filter(exp==lang_dominance_order_1&exp==lang_dominance_order_1)
+lang_back_remove<-lang_back_simple%>%
+  filter(exp!=lang_dominance_order_1|exp!=lang_dominance_order_1)
+```
+
+```{r}
+battery<-rbind(data_list$battery_up_dur,data_list$battery_up_formants,data_list$battery_up_ptich,data_list$battery_up_risetime)
+
+
+battery_tidy<-battery%>%
+  rename_with(tolower)%>%
+  ungroup()%>%
+ select(participant.private.id,tree.node.key,task.name,screen.name,screen.number,display,reaction.time,response,sound1,sound2,base1,base2,same)%>%
+  filter(display=="block" &screen.name == "Screen 3")%>%
+  mutate(responses=case_when(response == "'z'"~1,
+                             response == "'m'"~0),
+         correct=if_else(responses==same,1,0),
+         difference=abs(as.numeric(base1)-as.numeric(base2)))
+
+
+mad_standard=3
+
+battery_cleaned<-battery_tidy%>%
+  dplyr::filter(reaction.time>200)%>%
+  filter(!is.na(correct))%>%
+  mutate(log_rt=sqrt(as.numeric(reaction.time)))%>%
+  mutate(display_medians = median(log_rt),
+         abs_distance = abs(display_medians-log_rt),
+         mean_distance = mean(abs_distance),
+         upper_mad = display_medians+(mean_distance*mad_standard),
+         lower_mad = display_medians-(mean_distance*mad_standard))%>%
+  group_by(participant.private.id)%>%
+  mutate(participants_medians = median(log_rt))%>%
+  dplyr::filter(log_rt<upper_mad &log_rt>lower_mad)
+
+battery_cleaned%>%ggplot(aes(x=log_rt))+
+  geom_histogram()+
+  geom_point(aes(x=upper_mad,y=0),color="red")+
+  geom_point(aes(x=lower_mad,y=0),color="blue")+
+  facet_wrap(participant.private.id~.)
+
+battery_cleaned%>%ggplot(aes(x=factor(participant.private.id),y=participants_medians))+
+  geom_point()+
+  geom_point(aes(y=upper_mad,x=factor(participant.private.id)),color="red")+
+  geom_point(aes(y=lower_mad,x=factor(participant.private.id)),color="blue")
+
+battery_cleaned_part_agg<-battery_cleaned%>%
+  group_by(participant.private.id)%>%
+  mutate(correct=as.numeric(correct))%>%
+  summarise(score=mean(correct))%>%
+  ungroup()%>%
+  mutate(medians = median(score),
+        abs_distance = abs(medians-score),
+           mean_distance = mean(abs_distance),
+           upper_mad = medians+(mean_distance*mad_standard),
+           lower_mad = medians-(mean_distance*mad_standard))
+
+battery_cleaned_part_agg_filtered<-battery_cleaned_part_agg%>%
+  filter(score>lower_mad&score<upper_mad)
+
+length(unique(battery_cleaned_part_agg$participant.private.id))
+length(unique(battery_cleaned_part_agg_filtered$participant.private.id))
+
+battery_cleaned_part_agg%>%
+  ggplot(aes(x=factor(participant.private.id),y=score))+
+  geom_point()+
+  geom_point(aes(x=factor(participant.private.id),y=upper_mad),color="red")+
+  geom_point(aes(x=factor(participant.private.id),y=lower_mad),color="red")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+battery_cleaned_part_agg_keep<-battery_cleaned_part_agg%>%
+  filter(score<upper_mad & score>lower_mad)
+
+battery_cleaned_item_agg<-battery_cleaned%>%
+  mutate(item=paste(difference))%>%
+  group_by(item,participant.private.id,task.name)%>%
+summarise(score=mean(correct))%>%
+  ungroup()%>%
+    mutate(medians = median(score),
+           abs_distance = abs(medians-score),
+           mean_distance = mean(abs_distance),
+           upper_mad = medians+(mean_distance*mad_standard),
+           lower_mad = medians-(mean_distance*mad_standard))
+
+battery_cleaned_item_agg%>%
+  ggplot(aes(x=factor(item),y=score))+
+  geom_boxplot()+
+  geom_jitter()+
+  geom_point(aes(x=factor(item),y=upper_mad),color="red")+
+  geom_point(aes(x=factor(item),y=lower_mad),color="red")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+facet_grid(.~task.name)
+
+battery_agg2<-battery_cleaned%>%
+  group_by(participant.private.id, task.name) %>%
+  summarize(score=mean(correct))
+
+battery_agg2%>%ggplot(aes(x=task.name,y=score,color=factor(task.name)))+
+  geom_boxplot()+
+  geom_jitter()+
+  theme_minimal()
+
+battery_agg<-battery_cleaned%>%
+  filter(!is.na(response))%>%
+  mutate(
+    hit = if_else(same == 1 & responses == 1L, 1L, 0L),
+    f_a = if_else(same == 0 & responses == 1L, 1L, 0L),
+    miss = if_else(same == 0 & responses == 0L, 1L, 0L),
+    c_r = if_else(same == 1 & responses == 0L, 1L, 0L))%>%
+  group_by(participant.private.id, task.name)%>%
+  summarize(
+    score=mean(correct)+.5,
+    hit_count = sum(hit)+.5,
+    f_a_count = sum(f_a)+.5,
+    miss_count = sum(miss)+.5,
+    c_r_count = sum(c_r)+.5,
+    .groups = 'drop')%>%
+  mutate(
+    dprime = dprime(hit_count, 
+                             f_a_count, 
+                             hit_count + miss_count, 
+                             f_a_count + c_r_count)$dprime,
+    c = dprime(hit_count, 
+                        f_a_count, 
+                        hit_count + miss_count, 
+                        f_a_count + c_r_count)$c)%>%
+  select(participant.private.id, task.name, dprime, c)
+
+
+battery_agg%>%ggplot(aes(x=factor(task.name),y=dprime,color=factor(task.name),alpha=.4))+
+  geom_line(aes(group=factor(participant.private.id)),color="black")+
+  geom_violin()+
+  geom_boxplot(width=.5)+
+  geom_point()+
+  theme_minimal()
+
+battery_agg%>%ggplot(aes(x=c,y=dprime,color=factor(task.name)))+
+  geom_point()+
+  theme_minimal()+
+  facet_grid(.~factor(task.name))
+
+battery_agg_wider<-battery_agg%>%
+  pivot_wider(names_from = task.name,values_from = c(dprime:c))
+
+battery_agg_wider_simp<-battery_agg_wider
+ggpairs(battery_agg_wider_simp%>%select(!participant.private.id))
+
+
+initial_participants <- battery_agg_wider_simp$participant.private.id
+
+battery_agg_wider_simp<-battery_agg_wider_simp%>%filter(participant.private.id%in%battery_cleaned_part_agg_filtered$participant.private.id)
+```
+
+```{r}
+#cronbachs:
+battery_cb <- battery_cleaned %>%
+  mutate(item=paste(difference))%>%
+  select(correct,item,participant.private.id,task.name)
+
+
+battery_cb_dur_a<-cronbach.alpha(battery_cb%>%
+                                   filter(task.name=="battery_up_dur")%>%
+                                   group_by(item,participant.private.id)%>%
+                                    summarize(correct=mean(correct))%>%
+                                    pivot_wider(names_from = item, values_from = correct)%>%
+                                    mutate(across(everything(), ~replace_na(., 0)))%>%
+                                    select(-participant.private.id))$alpha
+battery_cb_formants_a<-cronbach.alpha(battery_cb%>%
+                                        filter(task.name=="battery_up_formants")%>%
+                                   group_by(item,participant.private.id)%>%
+                                    summarize(correct=mean(correct))%>%
+                                    pivot_wider(names_from = item, values_from = correct)%>%
+                                    mutate(across(everything(), ~replace_na(., 0)))%>%
+                                    select(-participant.private.id))$alpha
+
+battery_cb_risetime_a<-cronbach.alpha(battery_cb%>%
+                                        filter(task.name=="battery_up_risetime")%>%
+                                   group_by(item,participant.private.id)%>%
+                                    summarize(correct=mean(correct))%>%
+                                    pivot_wider(names_from = item, values_from = correct)%>%
+                                    mutate(across(everything(), ~replace_na(., 0)))%>%
+                                    select(-participant.private.id))$alpha
+battery_cb_pitch_a<-cronbach.alpha(battery_cb%>%
+                                     filter(task.name=="battery_up_ptich")%>%
+                                   group_by(item,participant.private.id)%>%
+                                    summarize(correct=mean(correct))%>%
+                                    pivot_wider(names_from = item, values_from = correct)%>%
+                                    mutate(across(everything(), ~replace_na(., 0)))%>%
+                                    select(-participant.private.id))$alpha
+
+battery_cb_pitch_a
+battery_cb_formants_a
+battery_cb_dur_a
+battery_cb_risetime_a
+```
+
+```{r}
+digit_span<-data_list$Digit_Span__Advanced
+
+digit_tidy<-digit_span%>%
+  rename_with(tolower)%>%
+  filter(participant.private.id%in%battery_cleaned_part_agg_filtered$participant.private.id)%>%
+  select(participant.private.id,tree.node.key,task.name,
+         target,response,length,`correct?`,total.correct)%>%
+  filter(`correct?`==1)%>%
+  group_by(participant.private.id)%>%
+  mutate(length=as.numeric(length))%>%
+  summarize(max_working_memory=max(length),
+         min_working_memory=min(length),
+         mean_working_memory=mean(length),
+         max_correct=max(total.correct))
+
+digit_tidy%>%
+  ggplot(aes(x=1,y=max_correct,color=factor(max_working_memory)))+
+  geom_jitter()
+
+digit_cleaned<-digit_tidy%>%
+  ungroup()%>%
+  mutate(max_correct=as.numeric(max_correct),
+         display_medians = as.numeric(median(max_correct)),
+         abs_distance = abs(display_medians-mean_working_memory),
+         mean_distance = mean(abs_distance),
+         upper_mad = display_medians+(mean_distance*mad_standard),
+         lower_mad = display_medians-(mean_distance*mad_standard))%>%
+  filter(max_correct>lower_mad&max_correct<upper_mad)
+
+digit_cleaned%>%
+  ggplot(aes(x=1,y=max_correct,color=factor(max_working_memory)))+
+  geom_jitter()
+
+#cronbach
+digit_cb<-digit_span%>%
+  rename_with(tolower)%>%
+  ungroup()%>%
+  select(participant.private.id,tree.node.key,task.name,
+         target,response,length,`correct?`,total.correct)%>%
+  mutate(correct = ifelse(is.na(`correct?`), 0, `correct?`))%>%
+  group_by(length) %>%
+  mutate(row_id = row_number())%>%
+  ungroup()%>%
+  select(correct,row_id,length)%>%
+  mutate(correct=as.numeric(correct))%>%
+  pivot_wider(names_from = length, values_from = correct)%>%
+  mutate(across(everything(), ~replace_na(., 0)))%>%
+  select(-row_id)%>%
+  select(where(~ !all(. == 1) & !all(. == 0)))
+
+digit_cb_a<-cronbach.alpha(digit_cb)$alpha
+digit_cb_a
+```
+
+```{r}
+lextale<-data_list$English_LexTALE
+colnames(lextale)
+
+table(tolower(names(lextale)))
+
+lextale_tidy<-lextale%>%
+  mutate(response2=Response)%>%
+  select(-Response)%>%
+  rename_with(tolower)%>%
+  select(participant.private.id,screen.name,zone.type,reaction.time,item,correct,response)%>%
+  filter(zone.type=="response_keyboard")%>%
+  filter(reaction.time>250)
+
+
+lextale_agg<-lextale_tidy%>%
+  mutate(
+    hit = if_else(response == "word" & correct == 1, 1, 0),
+    miss = if_else(response == "word" & correct == 0, 1, 0),
+    f_a = if_else(response == "non" & correct == 0, 1, 0),
+    c_r = if_else(response == "non" & correct == 1, 1, 0))%>%
+  group_by(participant.private.id) %>%
+  summarize(
+    score=mean(correct)+.5,
+    hit_count = sum(hit)+.5,
+    f_a_count = sum(f_a)+.5,
+    miss_count = sum(miss)+.5,
+    c_r_count = sum(c_r)+.5,
+    .groups = 'drop')%>%
+  mutate(
+    dprime = dprime(hit_count, 
+                             f_a_count, 
+                             hit_count + miss_count, 
+                             f_a_count + c_r_count)$dprime,
+    c = dprime(hit_count, 
+                        f_a_count, 
+                        hit_count + miss_count, 
+                        f_a_count + c_r_count)$c)%>%
+  select(participant.private.id, dprime, c)%>%
+  mutate(lextale_score=dprime)%>%
+  select(-c(dprime, c))
+
+
+lextale_agg_cleaned<-lextale_agg%>%
+  ungroup()%>%
+  mutate(medians = median(lextale_score),
+         abs_distance = abs(medians-lextale_score),
+         mean_distance = mean(abs_distance),
+         upper_mad = medians+(mean_distance*mad_standard),
+         lower_mad = medians-(mean_distance*mad_standard))
+  #filter(lextale_score<upper_mad &lextale_score>lower_mad)
+lextale_agg_cleaned_simp<-lextale_agg_cleaned%>%
+  select(lextale_score,participant.private.id)
+
+lextale_cb <- lextale_tidy %>%
+  select(-reaction.time) %>%
+  mutate(correct=as.numeric(correct))%>%
+  pivot_wider(names_from = item, values_from = correct) %>%
+  select(-participant.private.id)%>%
+  mutate(across(everything(), ~replace_na(., 0)))
+
+
+lextale_cb_a<-cronbach.alpha(lextale_cb)$alpha
+lextale_cb_a
+
+lextale_agg_cleaned%>%
+  ggplot(aes(x=lextale_score))+
+  geom_histogram()
+```
+
+
+```{r}
+
+rhythm_file<-file.path(base_path,"experimental/build_on_gorilla/rhythm_memory/rhythm_memory.html")
+#rhythm_key<-read.csv(file.path(base_path,"data","workflow_data","rhythm_key.csv"))
+#melody key
+melody_file<-file.path(base_path,"experimental/build_on_gorilla/melody_memory/melody_memory.html")
+#cleaning HTML
+#rhythm and melody key clean up
+rhythmHTML <- paste(readLines(rhythm_file))
+rhythmHTML = data.frame(values=rhythmHTML)
+rhythmHTML$exp<-"rhythm"
+
+melodyHTML <- paste(readLines(melody_file))
+melodyHTML = data.frame(values=melodyHTML)
+melodyHTML$exp<-"melody"
+
+#clean HTML keys
+key<-rbind(rhythmHTML,melodyHTML)
+
+key<-key%>%
+  filter(grepl('correct_answers', values))%>%
+  filter(!grepl('var', values))%>%
+  separate_wider_delim(values, " = ", names = c("sound_stimuli_list", "corr_ans"))
+
+key$corr_ans <- gsub("\\[|\\]|\"|;", '',key$corr_ans)
+key$sound_stimuli_list <- gsub("\\[|\\]|correct_answers", '',key$sound_stimuli_list)
+
+key$sound_stimuli_list <- as.numeric(key$sound_stimuli_list)+1
+key<-key%>%mutate(sound_stimuli_list = paste(sound_stimuli_list,".flac",sep = ""))
+
+#melody key
+melody_key<-key%>%
+  filter(exp == "melody")%>%
+  select(!exp)%>%
+  separate_wider_delim(corr_ans,',',names = paste("screen",1:7))%>%
+  pivot_longer(cols =  !sound_stimuli_list, names_to = 'Screen.Name',names_prefix = "screen",values_to = "melody_ans")
+  
+melody_key$Screen.Name<-as.numeric(melody_key$Screen.Name)
+melody_key$melody_ans<-as.numeric(melody_key$melody_ans)
+
+#rhythm key
+rhythm_key<-key%>%
+  filter(exp == "rhythm")%>%
+  select(!exp)%>%
+  separate_wider_delim(corr_ans,',',names = paste("screen",1:13))%>%
+  pivot_longer(cols =  !sound_stimuli_list, names_to = 'Screen.Name',names_prefix = "screen",values_to = "beats_ans")
+  
+rhythm_key$Screen.Name<-as.numeric(rhythm_key$Screen.Name)
+rhythm_key$beats_ans<-as.numeric(rhythm_key$beats_ans)
+rhythm_key$timer<-(rhythm_key$Screen.Name*200)-200
+rhythm_key<-rhythm_key%>%
+  mutate(timer = if_else(Screen.Name == 1, -100,timer))%>%
+  mutate(timer_begin = if_else(Screen.Name == 1, -100,timer-200))
+
+```
+
+
+```{r}
+melody_data<-data_list$Melody_memory
+#cleaning melody data
+data<-melody_data%>%
+  select(Participant.Private.ID,display,sound_stimuli_list, UTC.Timestamp,Trial.Number,Screen.Name,Zone.Name,Zone.Type,Reaction.Time,Zone.Name,Response )
+
+data<-data%>%
+  filter(display == "trials_experimental",
+         Screen.Name != "sound play",
+         Zone.Type != "continue_button",
+         is.na(Response))%>%
+  mutate(melody_responses = as.numeric(recode(Zone.Name, one = 1,
+         two = 2,
+         three = 3,
+         four = 4,
+         Five = 5)),
+         Screen.Name = as.numeric(gsub("Screen", '',Screen.Name)))%>%
+  select(!Response)
+
+data_melody_full<-left_join(data,melody_key)
+data_melody_full<-data_melody_full%>%
+  mutate(melody_correct = if_else(melody_responses==melody_ans,1,0),
+         direction_incorrect = melody_responses-melody_ans,
+         error_type = if_else(direction_incorrect == 0, "Correct",
+                              if_else(direction_incorrect > 0, "sharp","flat")))
+
+```
+
+```{r}
+#melody participant and item removal
+
+#item and participant removal
+#no items removed here.
+#item removal for each sound file
+before_mad_removal_item_melody<-length(unique(data_melody_full$sound_stimuli_list))
+
+item_melody_agg<-data_melody_full%>%
+  group_by(sound_stimuli_list,Participant.Private.ID)%>%
+  summarize(accuracy= mean(melody_correct))
+
+item_melody_agg%>%
+  ggplot(aes(y=accuracy,x=0,fill=sound_stimuli_list))+
+  geom_violin()
+
+item_melody_agg%>%
+  ggplot(aes(y=accuracy,x=0,fill=Participant.Private.ID))+
+  geom_violin()
+
+item_melody_agg<-data_melody_full%>%
+  group_by(sound_stimuli_list)%>%
+  summarize(accuracy= mean(melody_correct))%>%
+  ungroup() %>%
+  mutate(display_medians = median(accuracy),
+         abs_distance = abs(display_medians-accuracy),
+         mean_distance = mean(abs_distance),
+         upper_mad = display_medians+(mean_distance*mad_standard),
+         lower_mad = display_medians-(mean_distance*mad_standard))%>%
+  filter(accuracy<upper_mad &accuracy>lower_mad)
+
+after_mad_removal_item_melody<-length(unique(item_melody_agg$sound_stimuli_list))
+
+#1 participants removed here.
+#participants removal
+before_mad_removal_part_melody<-length(unique(data_melody_full$Participant.Private.ID))
+
+part_melody_agg<-data_melody_full%>%
+  group_by(Participant.Private.ID)%>%
+  summarize(accuracy= mean(melody_correct))%>%
+  ungroup() %>%
+  mutate(display_medians = median(accuracy),
+         abs_distance = abs(display_medians-accuracy),
+         mean_distance = mean(abs_distance),
+         upper_mad = display_medians+(mean_distance*mad_standard),
+         lower_mad = display_medians-(mean_distance*mad_standard))%>%
+  filter(accuracy<upper_mad &accuracy>lower_mad)%>%
+  mutate(participant.private.id=Participant.Private.ID)
+
+after_mad_removal_part_melody<-length(unique(part_melody_agg$Participant.Private.ID))
+
+nrow(part_melody_agg)-length(unique(data_melody_full$Participant.Private.ID))
+nrow(item_melody_agg)-length(unique(data_melody_full$sound_stimuli_list))
+#item and participant agg sheets for visualizations
+item_part_melody_agg<-data_melody_full%>%
+  group_by(sound_stimuli_list,Participant.Private.ID)%>%
+  summarize(accuracy= mean(melody_correct))%>%
+  mutate(item_lower_mad=item_melody_agg$lower_mad[1],
+         item_upper_mad=item_melody_agg$upper_mad[1],
+         part_lower_mad=part_melody_agg$lower_mad[1],
+         part_upper_mad=part_melody_agg$upper_mad[1])
+
+title="item removal melody before removal-7.flac removed"
+p1<-item_part_melody_agg%>%
+  ggplot(aes(y=accuracy,x=sound_stimuli_list,fill=sound_stimuli_list))+
+  geom_boxplot()+
+  geom_point(aes(y=item_lower_mad),color="red")+
+  geom_point(aes(y=item_upper_mad),color="blue")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        legend.position = "none")
+p1
+
+title="item removal melody before removal-none removed"
+p1<-item_part_melody_agg%>%
+  ggplot(aes(y=accuracy,x=Participant.Private.ID,fill=Participant.Private.ID))+
+  geom_boxplot()+
+  geom_point(aes(y=part_lower_mad),color="red")+
+  geom_point(aes(y=part_upper_mad),color="blue")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        legend.position = "none")
+p1
+
+data_melody_full<-data_melody_full%>%
+  filter(Participant.Private.ID %in% part_melody_agg$Participant.Private.ID,
+         sound_stimuli_list %in% item_melody_agg$sound_stimuli_list)
+
+cb_melody<-item_part_melody_agg%>%
+  select(sound_stimuli_list,Participant.Private.ID,accuracy)%>%
+  pivot_wider(names_from = sound_stimuli_list,values_from = accuracy)
+
+cronbach_alpha <- cronbach.alpha(cb_melody%>%select(`1.flac`:`9.flac`))
+melody_cronbach_alpha<-cronbach_alpha$alpha
+print(melody_cronbach_alpha)
+```
+
+
+```{r}
+#melody visualization
+data_melody_full<-data_melody_full%>%
+  mutate(melody_correct = if_else(melody_responses==melody_ans,1,0),
+         direction_incorrect = melody_responses-melody_ans,
+         error_type = if_else(direction_incorrect == 0, "Correct",
+                              if_else(direction_incorrect > 0, "sharp","flat")))
+
+melody_agg<-data_melody_full%>%
+  group_by(Participant.Private.ID,sound_stimuli_list)%>%
+  summarize(melody_accuracy = mean(melody_correct))
+
+title="distroibution of correct flats and sharps for melody task"
+plot2<-data_melody_full%>%
+  ggplot()+
+  geom_jitter(aes(x=Screen.Name,y=direction_incorrect,color= error_type))+
+  theme_minimal()+
+  ggtitle(title)+
+  ylab("pitch high and low")+
+  xlab("sequence of melody")
+p1<-ggMarginal(plot2, groupColour = TRUE,groupFill = TRUE,margins = "y")
+p1
+
+cleaned_melody_agg<-melody_agg%>%
+  group_by(Participant.Private.ID)%>%
+  summarize(melody_score = mean(melody_accuracy))
+
+
+
+title="distroibution of correct flats and sharps for melody task-poster"
+plot2 <- data_melody_full %>%
+  ggplot(aes(x = Screen.Name, y = melody_ans, color = factor(error_type),fill = factor(error_type), size = abs(direction_incorrect))) +
+  geom_jitter(alpha = 0.3) +
+  theme_minimal() +
+  theme(legend.position = "right", 
+        legend.direction = "vertical",
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank())+
+  ylab("Correct Pitch")+
+  xlab("")+
+  scale_fill_discrete(name = "Error Type", labels = c("Correct", "Flat","Sharp"))+
+  scale_size_continuous(name = "Amount incorrect")
+
+p1 <- ggMarginal(plot2, 
+                 groupColour = TRUE,    
+                 groupFill = FALSE,  
+                 margins = "x",    
+                 adjust = 0.4,          
+                 colour = "white")        
+p1
+
+melody_agg_simp<-melody_agg%>%
+  group_by(Participant.Private.ID)%>%
+  summarize(melody_score=mean(melody_accuracy))%>%
+    rename(participant.private.id = Participant.Private.ID)
+```
+
+```{r}
+rhythm_data<-data_list$Rhythm_memory
+##cleaning rhythm data
+data<-rhythm_data%>%
+  select(Participant.Private.ID,display,sound_stimuli_list, UTC.Timestamp,Trial.Number,Screen.Name,Zone.Name,Zone.Type,Reaction.Time )
+
+data<-data%>%
+  filter(display == "trials_experimental")%>%
+  filter(Screen.Name != "sound play")%>%
+  mutate(beat = if_else(Zone.Type == "response_keyboard"|Zone.Type == "continue_keyboard",1,0))%>%
+  group_by(Participant.Private.ID,sound_stimuli_list,Trial.Number,Screen.Name)%>%
+  top_n(1, beat)
+
+data$Screen.Name <- as.numeric(gsub("Screen", '',data$Screen.Name))
+
+data<-data%>%
+  group_by(Trial.Number,sound_stimuli_list,Screen.Name,Participant.Private.ID)%>%
+  summarize(beats = sum(beat),time = UTC.Timestamp,rt = Reaction.Time)%>%
+  filter(Screen.Name != 14)%>%
+  mutate(double_beat = if_else(beats==2,1,0))%>%
+  mutate(beats = if_else(beats>0,1,0))%>%
+  distinct()
+
+data_rhythm_tidy<-left_join(data,rhythm_key)%>%
+  mutate(beats_correct = if_else(beats==beats_ans,1,0))
+
+#rhythm data
+data_rhythm_complete<-data_rhythm_tidy
+
+#rhythm removal for double beats
+data_rhythm_double<-data_rhythm_complete
+#second double beat visualized.
+#data_rhythm_complete%>%ggplot(aes(x=as.factor(double_beat),y=rt))+
+#  geom_violin()+
+#  facet_grid(1~beats_correct)
+
+#double beat removal rhythm (removing the first beat of a items from participants on screens with 2 beats)
+double_beat<-data_rhythm_double%>%
+  filter(double_beat == 1)%>%
+  arrange(rt)%>%
+  group_by(Trial.Number,Screen.Name,Participant.Private.ID)%>%
+  slice(1)
+
+#how many beat times have double beats == 0.01525637
+nrow(double_beat)/nrow(data_rhythm_complete)
+
+data_rhythm_double<-data_rhythm_double%>%
+  anti_join(double_beat,data_rhythm_double,by=c("Participant.Private.ID","Trial.Number","sound_stimuli_list","rt"))
+data_rhythm_complete<-data_rhythm_double
+
+#no items removed here.
+#item removal for each sound file
+before_mad_removal_item_rhythm<-length(unique(data_rhythm_complete$sound_stimuli_list))
+
+item_rhythm_agg<-data_rhythm_complete%>%
+  group_by(sound_stimuli_list)%>%
+  summarize(accuracy= mean(beats_correct))%>%
+  ungroup() %>%
+  mutate(display_medians = median(accuracy),
+         abs_distance = abs(display_medians-accuracy),
+         mean_distance = mean(abs_distance),
+         upper_mad = display_medians+(mean_distance*mad_standard),
+         lower_mad = display_medians-(mean_distance*mad_standard))%>%
+  filter(accuracy<upper_mad &accuracy>lower_mad)
+
+
+after_mad_removal_item_rhythm<-length(unique(item_rhythm_agg$sound_stimuli_list))
+#1 participants removed here.
+#participants removal
+before_mad_removal_part_rhythm<-length(unique(data_rhythm_complete$Participant.Private.ID))
+
+part_rhythm_agg<-data_rhythm_complete%>%
+  group_by(Participant.Private.ID)%>%
+  summarize(accuracy= mean(beats_correct))%>%
+  ungroup() %>%
+  mutate(display_medians = median(accuracy),
+         abs_distance = abs(display_medians-accuracy),
+         mean_distance = mean(abs_distance),
+         upper_mad = display_medians+(mean_distance*mad_standard),
+         lower_mad = display_medians-(mean_distance*mad_standard))%>%
+  filter(accuracy<upper_mad &accuracy>lower_mad)%>%
+  mutate(participant.private.id=Participant.Private.ID)
+
+after_mad_removal_part_rhythm<-length(unique(part_rhythm_agg$Participant.Private.ID))
+
+nrow(part_rhythm_agg)-length(unique(data_rhythm_complete$Participant.Private.ID))
+nrow(item_rhythm_agg)-length(unique(data_rhythm_complete$sound_stimuli_list))
+
+#item and participant agg sheets for visualizations
+item_part_rhythm_agg<-data_rhythm_complete%>%
+  group_by(sound_stimuli_list,Participant.Private.ID)%>%
+  summarize(accuracy= mean(beats_correct))%>%
+  mutate(item_lower_mad=item_rhythm_agg$lower_mad[1],
+         item_upper_mad=item_rhythm_agg$upper_mad[1],
+         part_lower_mad=part_rhythm_agg$lower_mad[1],
+         part_upper_mad=part_rhythm_agg$upper_mad[1])
+
+title="item removal rhythm before removal-none removed"
+p1<-item_part_rhythm_agg%>%
+  ggplot(aes(y=accuracy,x=sound_stimuli_list,fill=sound_stimuli_list))+
+  geom_boxplot()+
+  geom_point(aes(y=item_lower_mad),color="red")+
+  geom_point(aes(y=item_upper_mad),color="blue")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        legend.position = "none")
+p1
+
+title="item removal rhythm before removal-9339523 removed"
+p1<-item_part_rhythm_agg%>%
+  ggplot(aes(y=accuracy,x=Participant.Private.ID,fill=Participant.Private.ID))+
+  geom_boxplot()+
+  geom_point(aes(y=part_lower_mad),color="red")+
+  geom_point(aes(y=part_upper_mad),color="blue")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        legend.position = "none")
+p1
+
+data_rhythm_complete<-data_rhythm_complete%>%
+  filter(Participant.Private.ID %in% part_rhythm_agg$Participant.Private.ID,
+         sound_stimuli_list %in% item_rhythm_agg$sound_stimuli_list)
+
+
+cb_rhythm<-item_part_rhythm_agg%>%
+  select(sound_stimuli_list,Participant.Private.ID,accuracy)%>%
+  pivot_wider(names_from = sound_stimuli_list,values_from = accuracy)
+
+cronbach_alpha <- cronbach.alpha(cb_rhythm%>%select(`1.flac`:`9.flac`))
+rhythm_cronbach_alpha<-cronbach_alpha$alpha
+print(rhythm_cronbach_alpha)
+```
+
+```{r}
+#screen2 offset timing
+data_rhythm_complete<-data_rhythm_complete%>%
+  filter(Screen.Name!=1)%>% #screen one does not have real times
+  mutate(rt=as.numeric(rt),
+         time=as.numeric(time))%>%
+  mutate(rt = if_else(Screen.Name == 2,rt-100,rt)) #needs offset for timing of
+
+title<-"Raw RTs across screen (screen 1 removed and screen 2 adjusted)"
+p1<-data_rhythm_complete%>%
+  ggplot(aes(x=as.factor(Screen.Name),y=rt,alpha=.25))+
+  geom_jitter(aes(color=as.factor(beats_correct)))+
+  geom_boxplot()+
+  ggtitle(title)+
+  facet_grid(1~beats_ans)+
+  theme_minimal()
+p1
+
+#seems normally distributed in most screens- I don't see a reason for removal here. It is interesting that they are getting more an more offbeat as a trial continues. This makes since, errors start to compile.
+# create adjusted time based on accumulation of time.
+data_rhythm_complete<-data_rhythm_complete%>%
+  mutate(rt_adjusted = rt+timer)%>%
+  mutate(rt_adjusted = if_else(Screen.Name == 1, rt_adjusted,rt_adjusted-200))
+
+title<-"Raw RTs for beats correct and incorrect"
+p1<-data_rhythm_complete%>%ggplot(aes(x=rt_adjusted,fill=as.factor(beats),alpha=.5))+
+  geom_histogram(position = 'identity',bins = 100)+
+  ggtitle(title)+
+  theme_minimal()
+p1
+
+title<-"Raw RTs for beats correct and incorrect-density"
+p1<-data_rhythm_complete%>%ggplot(aes(x=rt_adjusted,y=1,fill=as.factor(beats),alpha=.5))+
+  geom_violin(position = 'identity',bins = 100,adjust = 0.1)+
+  ggtitle(title)+
+  theme_minimal()
+p1
+
+
+#prepare for data visualization 
+data_rhythm_complete<-data_rhythm_complete%>%
+  mutate(Name = factor(Screen.Name, levels=c(2:13)))
+
+vlines <- data.frame(xintercepts = seq(200, 2400, by = 200))
+
+title<-"Correct and Incorrect distrubutions by beat across trial for music"
+p1<-data_rhythm_complete%>%filter(beats!=0&rt_adjusted>200)%>%
+  ggplot(aes(x = rt_adjusted,show.legend = F,fill=as.factor(beats),group=interaction(as.factor(beats),as.factor(Name))))+
+  geom_density(alpha=.8)+
+  scale_fill_manual(values =c("#FDB515","#008F91"),labels=c("0"="No beat","1"="Beat"))+
+  scale_x_continuous(limits = c(0, 2450),breaks = c(400,800,1200,1600,2000))+
+  theme_minimal()+
+  theme(legend.position = c(.8, .8),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank())
+p1
+```
+
+```{r}
+title<-"Correct and Incorrect distrubutions by beat across trial"
+p1<-data_rhythm_complete%>%
+  ggplot(aes(x = rt_adjusted, y = Name, group= interaction(as.factor(beats),as.factor(Name)),fill = as.factor(beats),show.legend = F))+
+  geom_density_ridges(color="white",alpha=.8)+
+  geom_vline(data = vlines,aes(xintercept = xintercepts),color = "#D3D3D3",alpha=.2)+
+  scale_x_continuous(limits = c(0, 2450),breaks = c(400,800,1200,1600,2000))+
+  scale_fill_manual(values =c("#FDB515","#008F91"),labels=c("0"="No beat","1"="Beat"))+
+  scale_y_discrete(limits=rev)+
+  labs(x = "Time course (ms)", y = "Beat number within trial", fill = "",alpha="") +
+  theme_minimal()+
+  theme(legend.position = c(.8, .8),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank())
+#save_ggplot(p1,width = 5,height=5)
+
+#This plot shows mistakes from gorilla timing mechanism, which is less than .5% of the time. I am actually pretty impress with this.
+title<-"hitting beats across stimuli,participants, and beat position"
+plot1<-data_rhythm_complete%>%ggplot(aes(x=rt,y=as.factor(beats_ans),fill= as.factor(beats_ans),alpha=.01,color = as.factor(beats_correct)))+
+  #geom_errorbar(aes(xmin = timer, xmax = timer+200,y= as.factor(beats_ans)),color = "blue")+
+  geom_jitter()+
+  scale_x_continuous(breaks=seq(0,200,by=200))+
+  theme(#legend.position = "none",
+        # remove the vertical grid lines
+        panel.grid.major.y = element_blank() ,
+        panel.grid.minor.y = element_blank()  , 
+        # explicitly set the horizontal lines (or they will disappear too)
+        panel.grid.major.x = element_line(size=.5), 
+        panel.grid.minor.x = element_line(size=.5))+
+  theme_minimal()+
+  ggtitle(title)+
+  ylab("has a beat")
+p1<-ggMarginal(plot1, groupColour = TRUE,groupFill = TRUE,margins = "x")
+#save_ggplot(p1)
+
+cleaned_rhythm_agg_simp<-data_rhythm_complete%>%
+  group_by(Participant.Private.ID)%>%
+  summarize(beat_score = mean(beats_correct))%>%
+  rename(participant.private.id=Participant.Private.ID)
+
+```
+
+```{r}
+flanker<-data_list$Flanker_Task%>%
+  rename_with(tolower)
+
+flanker_cleaned<-flanker%>%
+  filter(participant.private.id%in%digit_cleaned$participant.private.id)%>%
+  select(participant.private.id,tree.node.key,task.name,display,
+         target,answer, fixation,type,response,reaction.time,trial.number,
+         correct,distractor,zone.type,randomise_trials)%>%
+  filter(display=="Block1"|display=="Block2"|display=="Block3"|display=="Block4")%>%
+  filter(zone.type == 'response_keyboard') %>%
+  mutate(condition = case_when(target == distractor ~ "congruent",
+                               TRUE ~ "incongruent"))%>%
+  select(-c(zone.type,display,target,distractor))%>% #don't need these columns anymore
+  rename(accuracy = correct)%>%
+  mutate(rt = as.numeric(reaction.time))%>%
+  mutate(accuracy = as.numeric(accuracy))%>%
+  filter(rt > 250, rt < 1750)%>%
+  mutate(
+    accuracy = as.numeric(accuracy),
+    condition = as.factor(condition),
+    id = as.factor(participant.private.id),
+    subject = as.factor(participant.private.id))
+
+flanker_part_acc <- flanker_cleaned %>%
+  dplyr::group_by(participant.private.id) %>%
+  summarise(accuracy = sum (accuracy)/length(accuracy))
+
+flanker_part_acc%>%ggplot(aes(x=accuracy,y=participant.private.id))+
+  geom_point()
+
+removed_parts_flanker = flanker_part_acc%>%
+  filter(accuracy <= 0.65)
+
+flanker_cleaned <- flanker_cleaned %>%
+  rename(congruency = condition)
+
+test_participant <- flanker_cleaned %>% filter(participant.private.id == "10218798")
+
+library(brms)
+
+flanker_cleaned <- flanker_cleaned %>%
+  mutate(accuracy = as.integer(accuracy))
+
+flanker_cleaned <- flanker_cleaned %>%
+  mutate(accuracy = as.numeric(accuracy),
+         reaction.time=as.numeric(reaction.time))  # Force numeric format
+
+
+flanker_counted <- flanker_cleaned %>%
+  ungroup() %>%
+  group_by(participant.private.id, trial.number) %>%
+  mutate(trial_count = row_number()) %>%  # Adds a count per (participant, trial)
+  ungroup()
+
+# Step 2: Pivot the data into wide format
+flanker_wide <- flanker_counted %>%
+  select(participant.private.id, reaction.time, trial.number, trial_count) %>%
+  pivot_wider(names_from = trial.number, values_from = reaction.time, values_fill = list(reaction.time = 0)) %>%
+  select(-participant.private.id)  # Remove ID for alpha calculation
+
+# Compute Cronbach’s Alpha
+cronbach_result <- cronbach.alpha(flanker_wide, na.rm = TRUE)
+flanker_alpha<-cronbach_result$alpha
+
+# Check if accuracy contains only 0s and 1s
+table(flanker_cleaned$accuracy)
+
+
+
+#ddm_model <- brm(
+#  bf(reaction.time | dec(accuracy) ~ 1 + congruency + (1 | #participant.private.id)),
+#  data = flanker_cleaned,
+#  family = wiener(),
+#  cores = 4, iter = 2000, warmup = 1000, chains = 4
+#)
+
+save_ddm_model <- function(model, prefix = "ddm_output") {
+  # Get a list of existing files matching the pattern
+  existing_files <- list.files(pattern = paste0("^", prefix, "_[0-9]+\\.rds$"))
+  
+  # Extract existing numbers and find the next available
+  if (length(existing_files) > 0) {
+    existing_numbers <- as.numeric(gsub(paste0(prefix, "_(\\d+)\\.rds"), "\\1", existing_files))
+    next_number <- max(existing_numbers, na.rm = TRUE) + 1
+  } else {
+    next_number <- 1
+  }
+
+  # Create the filename
+  filename <- paste0(prefix, "_", next_number, ".rds")
+
+  # Save the model
+  saveRDS(model, filename)
+  message("Model saved as: ", filename)
+}
+
+load_ddm_model <- function(prefix = "ddm_output") {
+  # Find all saved model files
+  existing_files <- list.files(pattern = paste0("^", prefix, "_[0-9]+\\.rds$"), full.names = TRUE)
+  
+  # Check if there are any saved files
+  if (length(existing_files) == 0) {
+    stop("No saved models found.")
+  }
+
+  # Sort files numerically to find the latest one
+  latest_file <- tail(sort(existing_files), 1)
+
+  # Load the most recent model into the same variable name
+  model <- readRDS(latest_file)
+  
+  message("Loaded model from: ", latest_file)
+  return(model)
+}
+
+
+
+# save fit  model:
+#save_ddm_model(ddm_model)
+
+# Load the most recent model into ddm_model
+ddm_model <- load_ddm_model()
+
+drift_rates <- ranef(ddm_model)$participant.private.id[, , "Intercept"]
+
+drift_rates_df <- data.frame(
+  participant.private.id = rownames(drift_rates),
+  drift_rate = drift_rates[, "Estimate"],
+  drift_rate_lower = drift_rates[, "Q2.5"],
+  drift_rate_upper = drift_rates[, "Q97.5"]
+)
+
+flanker_acc<-flanker_cleaned%>%
+  group_by(participant.private.id)%>%
+  summarize(acc=mean(accuracy))
+
+drift_comp<-drift_rates_df%>%
+  left_join(flanker_acc)
+
+flanker_simp<-drift_rates_df%>%
+  select(participant.private.id,drift_rate)
+
+drift_comp%>%ggplot(aes(x=drift_rate,y=acc))+
+  geom_point()
+```
+
+
+```{r}
+#part removal
+part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, lang_back_keep)
+part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, battery_agg_wider_simp)
+part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, part_rhythm_agg)
+part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, part_melody_agg)
+part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, digit_cleaned)
+
+part_keep_rem_agg <- part_keep_rem %>%
+  mutate(mean_presence = rowMeans(select(., -participant.private.id), na.rm = TRUE))
+```
+
+```{r}
+#chronbachs alpha
+cronbachs_alpha<-NULL
+cronbachs_alpha<-track_cronbach_alpha(existing_df = NULL,battery_cb_pitch_a)
+cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,battery_cb_formants_a)
+cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,battery_cb_dur_a)
+cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,battery_cb_risetime_a)
+cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,digit_cb_a)
+cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,lextale_cb_a)
+cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,melody_cronbach_alpha)
+cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,rhythm_cronbach_alpha)
+cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,flanker_alpha)
+```
+
+```{r}
+ind_diff<-lang_back_simple%>%
+  left_join(battery_agg_wider_simp)%>%
+  left_join(digit_tidy)%>%
+  left_join(lextale_agg_cleaned_simp)%>%
+  left_join(melody_agg_simp)%>%
+  left_join(cleaned_rhythm_agg_simp)%>%
+  left_join(flanker_simp)
+
+ind_diff_simp<-ind_diff%>%
+  select("participant.private.id", "age", "education",
+  "lang_acquisition_order_1", "lang_dominance_order_1", 
+  "exp", "dprime_battery_up_dur", "dprime_battery_up_formants", 
+  "dprime_battery_up_ptich", "dprime_battery_up_risetime", 
+  "mean_working_memory", "lextale_score", 
+  "melody_score", "beat_score", "drift_rate")
+
+ind_diff_scaled <- ind_diff_simp %>%
+  mutate(across(
+    c(mean_working_memory, 
+      lextale_score, drift_rate),
+    ~ {
+      mean_x <- mean(., na.rm = TRUE)
+      sd_x <- sd(., na.rm = TRUE)
+      ifelse(sd_x == 0, 0, (. - mean_x) / sd_x)  
+    },
+    .names = "{.col}_norm"))
+
+ind_diff_scaled <- ind_diff_simp %>%
+  mutate(across(c("mean_working_memory", "lextale_score", "drift_rate",
+                  starts_with("dprime"), "melody_score", "beat_score"),
+                ~ scale(.)))
+
+
+ind_diff_acoust_longer <- ind_diff_scaled %>%
+  pivot_longer(cols = c("mean_working_memory", "lextale_score", "drift_rate",starts_with("dprime"), "melody_score", "beat_score"),
+               names_to = "cog_measures",
+               values_to = "scores")
+```
+
+
+
+```{r,warning=FALSE}
+ind_diff_raw_longer<-ind_diff_simp%>%
+  pivot_longer(cols = c("mean_working_memory", "lextale_score", "drift_rate",starts_with("dprime"), "melody_score", "beat_score"),
+               names_to = "cog_measures",
+               values_to = "scores")
+  
+ind_diff_raw_longer2 <-ind_diff_raw_longer %>%
+  mutate(cog_measures = factor(cog_measures, levels = ordered_measures),
+         cog_measures_num=as.numeric(cog_measures)) %>% 
+  arrange(exp, participant.private.id, cog_measures)
+
+  
+ind_diff_acoust_longer <- ind_diff_scaled %>%
+  pivot_longer(cols = c("mean_working_memory", "lextale_score", "drift_rate",starts_with("dprime"), "melody_score", "beat_score"),
+               names_to = "cog_measures",
+               values_to = "scores")
+
+ordered_measures <- c("dprime_battery_up_dur", 
+                      "dprime_battery_up_formants", 
+                      "dprime_battery_up_ptich", 
+                      "dprime_battery_up_risetime", 
+                      "mean_working_memory", 
+                      "lextale_score", 
+                      "drift_rate",
+                      "melody_score", 
+                      "beat_score") 
+
+ind_diff_acoust_longer2 <- ind_diff_acoust_longer %>%
+  mutate(cog_measures = factor(cog_measures, levels = ordered_measures),
+         cog_measures_num=as.numeric(cog_measures)) %>%  
+  arrange(exp, participant.private.id, cog_measures)  
+
+
+ind_diff_acoust_longer2$measure_category <- dplyr::case_when(
+  ind_diff_acoust_longer2$cog_measures %in% c("drift_rate", "mean_working_memory", "lextale_score") ~ "Cognitive",
+  ind_diff_acoust_longer2$cog_measures %in% c("dprime_battery_up_dur", "dprime_battery_up_formants", "dprime_battery_up_ptich", "dprime_battery_up_risetime") ~ "Acoustics",
+  ind_diff_acoust_longer2$cog_measures %in% c("melody_score", "beat_score") ~ "Music",
+  TRUE ~ "Other"
+)
+
+ind_diff_acoust_longer3 <- ind_diff_acoust_longer2 %>%
+  arrange(exp, participant.private.id) %>% 
+  ungroup() %>% 
+  mutate(renumbered_id = row_number()) %>%
+  mutate(part_id = ceiling(renumbered_id / 9))
+
+num_new_rows <- nrow(ind_diff_acoust_longer3)/3
+
+max_id <- max(ind_diff_acoust_longer3$renumbered_id, na.rm = TRUE)
+
+cog_measures_values <- unique(ind_diff_acoust_longer3$cog_measures)
+measure_category_values <- unique(ind_diff_acoust_longer3$measure_category)
+
+new_cog_measures <- rep(cog_measures_values, length.out = num_new_rows)
+new_category_measures <- rep(measure_category_values, length.out = num_new_rows)
+
+new_rows <- ind_diff_acoust_longer3[1:num_new_rows, ] %>%
+  mutate(across(everything(), ~ NA)) 
+
+score_increments <- c(
+  "dprime_battery_up_dur" = 0.5,
+  "dprime_battery_up_formants" = 1.0,
+  "dprime_battery_up_ptich" = 1.5,
+  "dprime_battery_up_risetime" = 2.00,
+  "mean_working_memory" = 0.5,
+  "lextale_score" = 1.0,
+  "melody_score" = .5,
+  "beat_score" = 1,
+  "drift_rate" = 1.5
+)
+
+new_rows <- new_rows %>%
+  mutate(
+    cog_measures = new_cog_measures,
+    measure_category = new_category_measures,
+    scores = ifelse(cog_measures %in% names(score_increments), score_increments[cog_measures], 0),
+    renumbered_id = seq(max_id + 1, max_id + num_new_rows), 
+    part_id = ceiling(renumbered_id / 9) 
+  )
+
+ind_diff_acoust_longer3 <- bind_rows(ind_diff_acoust_longer3, new_rows)
+
+group_bounds <- ind_diff_acoust_longer3 %>%
+  arrange(exp, renumbered_id) %>%  
+  group_by(exp) %>%
+  summarise(
+    xmin = min(renumbered_id), 
+    xmax = max(renumbered_id))%>%
+  mutate(
+    xmid = floor((xmin + xmax) / 2))%>%
+  mutate(
+    xmin = ifelse(xmin == min(xmin), -Inf, xmin),  
+    xmax = ifelse(xmax == max(xmax), Inf, xmax))%>% 
+  ungroup()
+
+     
+rect_colors <- c("dutch" = "black", 
+                 "english" = "grey80")
+acoustics_colors <- c(dprime_battery_up_dur="#E63946", 
+                      dprime_battery_up_ptich="#F4A261",
+                      dprime_battery_up_formants="#2A9D8F", 
+                      dprime_battery_up_risetime="#264653")  
+cognitive_colors <- c("drift_rate" = "#ffa600", 
+                      "mean_working_memory" = "grey", 
+                      "lextale_score" = "#bc5090") 
+music_colors <- c("melody_score" = "#003f5c", "beat_score" = "#ff6361")  
+unique(ind_diff_acoust_longer3$cog_measures)
+category_colors <- c(acoustics_colors, cognitive_colors, music_colors)
+rect_colors <- c(rect_colors,category_colors)
+
+
+ind_diff_raw_longer2 <- ind_diff_raw_longer2 %>%
+  mutate(cog_measures = fct_inorder(cog_measures)) 
+
+strip_color_map <- category_colors[names(category_colors) %in% unique(ind_diff_raw_longer2$cog_measures)]
+
+
+library(patchwork)
+library(plotly)
+
+category_colors <- c(
+  "dprime_battery_up_dur" = "#E63946", 
+  "dprime_battery_up_formants" = "#2A9D8F", 
+  "dprime_battery_up_ptich" = "#F4A261",
+  "dprime_battery_up_risetime" = "#264653", 
+  "lextale_score" = "#bc5090", 
+  "mean_working_memory" = "grey",
+  "drift_rate" = "#ffa600",
+  "melody_score" = "#003f5c",
+  "beat_score" = "#ff6361"
+)
+ordered_measures <- names(category_colors)
+ind_diff_raw_longer2$cog_measures <- factor(
+  ind_diff_raw_longer2$cog_measures, 
+  levels = ordered_measures
+)
+
+ind_diff_acoust_longer3$cog_measures <- factor(
+  ind_diff_acoust_longer3$cog_measures, 
+  levels = ordered_measures
+)
+
+strip_color_map <- category_colors[names(category_colors) %in% unique(ind_diff_raw_longer2$cog_measures)]
+
+
+plots <- lapply(unique(ind_diff_raw_longer2$cog_measures), function(measure) {
+  ggplot(ind_diff_raw_longer2 %>% filter(cog_measures == measure), 
+         aes(x = 0, y = scores)) +
+    
+    geom_half_violin(aes(fill = exp, group = interaction(exp, cog_measures)), 
+                     color = "white", alpha = .8, position = "identity", side = "r") +
+
+    geom_jitter(aes(x = -0.25, color = exp), alpha = .3, size = 1, width = 0.05, height = 0) +
+    
+    theme_minimal() +
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      legend.position = "bottom",
+      
+      strip.background = element_rect(fill = NA, color = category_colors[measure], linewidth = 2),  
+      strip.text = element_text(face = "bold", color = category_colors[measure])  
+    ) +
+    
+    facet_wrap(~cog_measures, scales = "free_x", 
+               labeller = as_labeller(cog_measure_labels), switch = "y") +  
+
+    scale_fill_manual(values = c("dutch" = "black", "english" = "grey80"),  
+                    labels = c("dutch" = "Dutch", "english" = "English")) +  
+    scale_color_manual(values = c("black", "grey80"), guide = "none") +
+
+    labs(x = NULL, y = NULL) + 
+
+    coord_flip()
+})
+
+
+cog_measures_plot <- wrap_plots(plots, ncol = 1) + 
+  plot_layout(guides = "collect") &  
+  theme(legend.position = "bottom",  
+        legend.title = element_blank())  
+
+cog_measures_plot+
+  scale_fill_manual(values = category_colors)
+
+```
+
+
+```{r}
+p1<-ggplot(ind_diff_acoust_longer3, aes(
+    y = scores, 
+    x = renumbered_id, 
+    group = interaction(renumbered_id))) +
+  geom_rect(data = group_bounds, aes(
+    xmin = xmin, xmax = xmax, ymin = -Inf, ymax = Inf, fill = exp), 
+    alpha = 0.8, inherit.aes = FALSE,show.legend = FALSE)+
+
+  geom_hline(yintercept = 0, color = "white", linewidth = 16)+
+  geom_hline(yintercept = 21, color = "white", linewidth = 11)+
+  geom_hline(yintercept = 25, color = "white", linewidth = 10)+
+  geom_hline(yintercept = 31, color = "white", linewidth = 10)+
+  geom_hline(yintercept = 18, color = "black", linewidth = .5)+
+  geom_hline(yintercept = 26, color = "black", linewidth = .5)+
+  geom_hline(yintercept = 34, color = "black", linewidth = .5)+
+  geom_line(aes(group = interaction(cog_measures),color=cog_measures),alpha = .0, linewidth = 1) +  
+    geom_col(data=ind_diff_acoust_longer3,aes(
+    y = scores*3,  
+    x = part_id*9,
+    group=cog_measures,
+    fill = cog_measures),
+    position = "stack", 
+    alpha = 1, 
+    size = 1)+
+  theme(
+    axis.text.y = element_text(size = 10),  
+    panel.grid.major.y = element_blank()
+  ) +
+  labs(
+    y = "",  
+    x = "",
+    color = "",
+    title = ""
+  )+
+  theme_minimal()+
+  geom_point(aes(x=renumbered_id,y = scores*2+case_when(
+        measure_category == "Acoustics" ~ 34,
+        measure_category == "Cognitive" ~ 26,
+        measure_category == "Music" ~ 18,
+        TRUE ~ 0 
+    ), color = cog_measures,group=cog_measures),alpha = .4, size=.5)+
+  geom_line(aes(x=renumbered_id,y = scores*2+case_when(
+        measure_category == "Acoustics" ~ 34,
+        measure_category == "Cognitive" ~ 26,
+        measure_category == "Music" ~ 18,
+        TRUE ~ 0 
+    ), color = cog_measures,group=cog_measures),alpha = 1, linewidth=.3)+
+  scale_fill_manual(values = rect_colors) + 
+  scale_color_manual(values = category_colors)+
+  geom_rect(data = group_bounds, aes(
+    xmin = num_new_rows*3+2, 
+    xmax = num_new_rows*4+9, 
+    ymin = -Inf, ymax = Inf, 
+    fill = exp), 
+    alpha = 1, 
+    inherit.aes = FALSE,
+    fill="white",
+    show.legend = FALSE)+
+  geom_hline(yintercept = 0, color = "black", linewidth = .2)+
+  #coord_polar()+
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_blank())+
+  guides(
+       color = "none")+
+  # Bottom set
+  geom_rect(aes(xmin = num_new_rows/2*7-5, 
+                xmax = num_new_rows/2*6+9, 
+                ymin = 16.5, ymax = 19.5),
+            fill = "#003f5c", color = NA, 
+            alpha = 0.4) +
+  geom_text(aes(x = (num_new_rows/2*7-5 + 
+                       num_new_rows/2*6+9) / 2, 
+                y = (16.5 + 19.5) / 2, 
+                label = "Melody"), 
+            color = "white",
+            angle = 67.5) +
+  geom_rect(aes(xmin = num_new_rows/2*7+5, 
+                xmax = num_new_rows/2*8+9, 
+                ymin = 16.5, 
+                ymax = 19.5),
+            fill = "#ff6361", 
+            color = NA, 
+            alpha = 0.4) +
+  geom_text(aes(x = (num_new_rows/2*7+5 + 
+                       num_new_rows/2*8+9) / 2, 
+                y = (16.5 + 19.5) / 2, 
+                label = "Rhythm"), 
+            color = "black",
+            angle = 22.5) +
+
+  # Middle set
+  geom_rect(aes(xmin = num_new_rows/2*7-5, 
+                xmax = num_new_rows/2*6+9, 
+                ymin = 26.25, 
+                ymax = 29.25),
+            fill = "#bc5090", 
+            color = NA, 
+            alpha = 0.45) +
+  geom_text(aes(x = (num_new_rows/2*7-5 + 
+                       num_new_rows/2*6+9) / 2, 
+                y = (26.25 + 29.25) / 2, 
+                label = "LexTALE"), 
+            color = "white",
+            angle = 67.5) +
+
+  geom_rect(aes(xmin = num_new_rows/2*7+5, 
+                xmax = num_new_rows/2*8+9, 
+                ymin = 26.25, ymax = 29.25),
+            fill = "grey", 
+            color = NA, 
+            alpha = 0.45) +
+  geom_text(aes(x = (num_new_rows/2*7+5 + 
+                       num_new_rows/2*8+9) / 2, 
+                y = (26.25 + 29.25) / 2, 
+                label = "Work-mem"), 
+            color = "black",
+            angle = 22.5) +
+
+  geom_rect(aes(xmin = num_new_rows*3+9, 
+                xmax = num_new_rows/2*8+9, 
+                ymin = 22.75, ymax = 25.75),
+            fill = "#ffa600", 
+            color = NA, 
+            alpha = 0.45) +
+  geom_text(aes(x = (num_new_rows*3+9 + 
+                       num_new_rows/2*8+9) / 2, 
+                y = (22.75 + 25.75) / 2, 
+                label = "Drift rate"), 
+            color = "white",
+            angle = 45) +
+
+  # Top set
+  geom_rect(aes(xmin = num_new_rows/2*7-5, 
+                xmax = num_new_rows/2*6+9, 
+                ymin = 37, ymax = 40),
+            fill = "#E63946", 
+            color = NA, 
+            alpha = 0.45) +
+  geom_text(aes(x = (num_new_rows/2*7-5 + 
+                       num_new_rows/2*6+9) / 2, 
+                y = (37 + 40) / 2, 
+                label = "Duration D'"), 
+            color = "white",
+            angle = 67.5) +
+
+  geom_rect(aes(xmin = num_new_rows/2*7+5, 
+                xmax = num_new_rows/2*8+9, 
+                ymin = 37, ymax = 40),
+            fill = "#F4A261", 
+            color = NA, 
+            alpha = 0.45) +
+  geom_text(aes(x = (num_new_rows/2*7+5 + 
+                       num_new_rows/2*8+9) / 2, 
+                y = (37 + 40) / 2, 
+                label = "Pitch D'"), 
+            color = "white",
+            angle = 22.5) +
+
+  geom_rect(aes(xmin = num_new_rows/2*7-5, 
+                xmax = num_new_rows/2*6+9, 
+                ymin = 33.5, ymax = 36.5),
+            fill = "#2A9D8F", 
+            color = NA, 
+            alpha = .45) +
+  geom_text(aes(x = (num_new_rows/2*7-5 + 
+                       num_new_rows/2*6+9) / 2, 
+                y = (33.5 + 36.5) / 2, 
+                label = "Formant D'"), 
+            color = "white",
+            angle = 67.5) +
+
+  geom_rect(aes(xmin = num_new_rows/2*7+5, 
+                xmax = num_new_rows/2*8+9, 
+                ymin = 33.5, 
+                ymax = 36.5),
+            fill = "#264653", 
+            color = NA, 
+            alpha = .45) +
+  geom_text(aes(x = (num_new_rows/2*7+5 + 
+                       num_new_rows/2*8+9) / 2, 
+                y = (33.5 + 36.5) / 2, 
+                label = "Risetime D'"), 
+            color = "white",
+            angle = 22.5)+
+  geom_text(aes(x = num_new_rows/2*7, 
+                y = 44, 
+                label = "Legend"), 
+            color = "black",
+            angle = 45)+
+  geom_text(aes(x = num_new_rows/2, 
+                y = 42, 
+                label = "Dutch"), 
+            color = "white",
+            angle = -45)+
+  geom_text(aes(x = num_new_rows*2, 
+                y = 42, 
+                label = "English"), 
+            color = "black",
+            angle = 0)+
+  geom_text(aes(x = num_new_rows/2*7, 
+                y = 2, 
+                label = "0 lines"), 
+            color = "black",
+            angle = 45)+
+  theme(legend.position = "none",
+        plot.margin = margin(-30,-150,  -30, -150, "pt"))+
+  coord_polar()
+
+p1
+```
+
+```{r}
+lang_back_simple<-lang_back_simple%>%
+  mutate(in_person=if_else(experiment=="data_exp_161097-v1"|experiment=="data_exp_142778-v2","in-person","online"),
+    education = factor(
+      str_to_title(education),
+      levels = c("High School", "Bachelors", "Masters", "Doctoral")
+    ),
+    exp_names = str_to_title(exp))
+
+# 1. Age Distribution
+plot1 <- ggplot(lang_back_simple, aes(x = interaction(in_person,exp), y = as.numeric(age), fill = exp,group=interaction(in_person,exp_names))) +
+  geom_violin(alpha = 0.6, color = "white") +
+  geom_boxplot(width = 0.1, alpha = 0.7, color = "white", outlier.shape = NA) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x = "location and Experimental Group", y = "Age") +
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("dutch", "Dutch", x)
+    x <- gsub("english", "English", x)
+    return(x)
+  }) + 
+  scale_fill_manual(values = c("black", "grey80"))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+plot1
+
+
+# 2. Gender Distribution
+plot2 <- ggplot(lang_back_simple, aes(x = gender, fill = exp)) +
+  geom_bar(position = "dodge") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x = "Gender", y = "Count", title = "") +
+  scale_fill_manual(values = c("black", "grey80"))+
+  scale_x_discrete(labels = function(x) {
+    x <- gsub("Non_binary", "Non-Binary", x)
+    #x <- gsub("Genderfluid/Genderqueer", "Genderfluid/GQ", x)
+    return(x)
+  }) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+plot2
+unique(lang_back_simple$gender)
+
+# 3. Education vs. Number of Languages
+plot3 <- ggplot(lang_back_simple, aes(x = education, y = number_of_langs, fill = exp)) +
+  geom_jitter(width = 0.2, shape = 21, size = 2, alpha = 0.5, aes(fill = exp)) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(x = "Education Level", y="Number of Languages", title = "") +
+  scale_fill_manual(values = c("black", "grey80"))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+
+plot1
+```
+
+```{r}
+library(cowplot)
+
+background_plot <- (plot1 | plot2 | plot3) + plot_layout(guides = "collect") &
+  theme(legend.position = "none")
+background_plot
+```
+
+
+```{r}
+stacked_plot <- plot_grid(
+  p1, background_plot,
+  nrow = 2, 
+  rel_heights = c(4, 1.5),  
+  labels = c("B", "C"),  
+  label_size = 14,
+  label_x = c(0.5, .5)
+)
+
+combined_plot <- plot_grid(
+  cog_measures_plot, stacked_plot, 
+  ncol = 2, 
+  rel_widths = c(1, 4), 
+  labels = c("A", ""), 
+  label_size = 14,
+  label_x = c(0.5, NA),  
+  label_y = c(1, NA)
+)
+
+combined_plot
+
+ggsave("combined_plot_circle.pdf", combined_plot, width = 12, height = 14, dpi = 300)
+```
+
+```{r}
+ge_list_1_data<-data_list$Ge_et_al_task_ET_list_1
+ge_list_2_data<-data_list$Ge_et_al_task_ET_list_2
+
+ge_list_data<-ge_list_1_data%>%
+  rbind(ge_list_2_data)
+  #filter(experiment!="data_exp_142778-v2")
+
+ge_list_1_et_data<-et_data_list$Ge_et_al_task_ET_list_1
+ge_list_2_et_data<-et_data_list$Ge_et_al_task_ET_list_2
+```
+
+```{r}
+ge_list_data_c<-ge_list_data%>%
+  rename_with(tolower)%>%
+  select(participant.private.id,screen.name,spreadsheet,task.name,spreadsheet.row,task,response,zone.type,zone.name,visual,audio,display)%>%
+  filter(zone.type=="content_web_audio")%>%
+  filter(response=="AUDIO PLAY REQUESTED")%>%
+  filter(display  != "practice")%>%
+  mutate(object = gsub(".mp3", "", audio))%>%
+  mutate(filler = ifelse(substr(object, 1, 1) == "f", 1, 0))%>%
+  mutate(condition = case_when(
+    grepl("b", audio) ~ "b",
+    grepl("a", audio) ~ "a",
+    TRUE ~ NA_character_
+  ))%>%
+  mutate(participant.private.id = as.character(participant.private.id))%>%
+  mutate(spreadsheet.row = as.double(spreadsheet.row))
+
+
+ge_et_data<-ge_list_1_et_data%>%
+  rbind(ge_list_2_et_data)%>%
+  mutate(participant.private.id=participant_id,
+         spreadsheet.row=spreadsheet_row)%>%
+  select(participant.private.id,spreadsheet.row,screen_index,time_stamp,type,
+         face_conf,x_pred_normalised,y_pred_normalised)%>%
+  filter(type=="prediction")%>%
+  group_by(participant.private.id,spreadsheet.row)%>%
+  mutate(time=time_stamp-min(time_stamp))%>%
+  filter(face_conf==1)%>%
+  mutate(participant.private.id = as.character(participant.private.id))%>%
+  mutate(spreadsheet.row = as.double(spreadsheet.row))
+```
+
+```{r}
+ge_data<-ge_list_data_c%>%
+  left_join(ge_et_data)%>%
+  mutate(time_rounded = round(time / 500) * 500) %>%
+  mutate(x_pred_normalised = x_pred_normalised - 0.5,
+         y_pred_normalised = y_pred_normalised - 0.5) %>%
+  filter(x_pred_normalised > -0.5 & x_pred_normalised < 0.5 &
+         y_pred_normalised > -0.5 & y_pred_normalised < 0.5) %>%
+  mutate(quadrant = case_when(
+           x_pred_normalised < 0 & y_pred_normalised > 0 ~ "1",
+           x_pred_normalised >= 0 & y_pred_normalised > 0 ~ "2",
+           x_pred_normalised < 0 & y_pred_normalised <= 0 ~ "4",
+           x_pred_normalised >= 0 & y_pred_normalised <= 0 ~ "3" ))
+
+
+ge_data%>%ggplot(aes(x=x_pred_normalised,y=y_pred_normalised,color=quadrant))+
+  geom_point()
+```
+
+```{r}
+library(stringr)
+time_course_cleaned <- time_course %>%
+  mutate(time_cats=sapply(str_split(sound_names, "_"), 
+                          function(x) tail(x, 1)),
+         audio=sapply(str_split(sound_names, "_"), 
+                      function(x) paste(head(x, 1), collapse = "_")))%>%
+  select(-sound_names)%>%
+  mutate(start_times=start_times*1000,
+         end_times=end_times*1000)%>%
+  pivot_wider(names_from = time_cats,
+              values_from = c(start_times, end_times))
+
+mapping_audio_cleaned<-mapping_audio%>%
+  right_join(time_course_cleaned)%>%
+  mutate(audio=paste(audio,".wav",sep=""))
+
+ge_data_mapped<-ge_data%>%
+  right_join(mapping)%>%
+  right_join(mapping_audio_cleaned)%>%
+  mutate(
+    target = case_when(
+      str_detect(upper_left, target_verb) & str_detect(upper_left, target_object) ~ 1,
+      str_detect(upper_right, target_verb) & str_detect(upper_right, target_object) ~ 2,
+      str_detect(lower_right, target_verb) & str_detect(lower_right, target_object) ~ 3,
+      str_detect(lower_left, target_verb) & str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    verb_comp = case_when(
+      !str_detect(upper_left, target_verb) & str_detect(upper_left, target_object) ~ 1,
+      !str_detect(upper_right, target_verb) & str_detect(upper_right, target_object) ~ 2,
+      !str_detect(lower_right, target_verb) & str_detect(lower_right, target_object) ~ 3,
+      !str_detect(lower_left, target_verb) & str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    object_comp = case_when(
+      str_detect(upper_left, target_verb) & !str_detect(upper_left, target_object) ~ 1,
+      str_detect(upper_right, target_verb) & !str_detect(upper_right, target_object) ~ 2,
+      str_detect(lower_right, target_verb) & !str_detect(lower_right, target_object) ~ 3,
+      str_detect(lower_left, target_verb) & !str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_
+    ),
+    dist = case_when(
+      !str_detect(upper_left, target_verb) & !str_detect(upper_left, target_object) ~ 1,
+      !str_detect(upper_right, target_verb) & !str_detect(upper_right, target_object) ~ 2,
+      !str_detect(lower_right, target_verb) & !str_detect(lower_right, target_object) ~ 3,
+      !str_detect(lower_left, target_verb) & !str_detect(lower_left, target_object) ~ 4,
+      TRUE ~ NA_real_))
+
+ge_data_mapped_clean<-ge_data_mapped%>%  
+  mutate(target_looks=ifelse(quadrant==target,1,0),
+         obj_comp_looks=ifelse(quadrant==object_comp,1,0),
+         verb_comp_looks=ifelse(quadrant==verb_comp,1,0),
+         dist_looks=ifelse(quadrant==dist,1,0))%>%
+  mutate(
+    time=time-200,#launch secade
+    time=time-10,#gorilla play delay
+    time_cats = case_when(
+      time < start_times_1 ~ 0,
+      time > start_times_1 & time <= end_times_1 ~ 1,
+      time > start_times_2 & time <= end_times_2 ~ 2,
+      time > start_times_3 & time <= end_times_3 ~ 3,
+      time > start_times_4 & time <= end_times_4 ~ 4,
+      time > start_times_5 & time <= end_times_5 ~ 5,
+      time > start_times_6 & time <= end_times_6 ~ 6,
+      time > start_times_7 & time <= end_times_7 ~ 7,
+      time > start_times_8 & time <= end_times_8 ~ 8,
+      time > start_times_9 & time <= end_times_9 ~ 9,
+      time > start_times_10 & time <= end_times_10 ~ 10,
+      time > start_times_11 & time <= end_times_11 ~ 11,
+      time > end_times_1 ~ 12,
+      TRUE ~ NA_real_))%>%
+  filter(time_cats>-1,
+         time<start_times_11+500)%>%
+  mutate(
+    condition = case_when(
+      condition == "a" ~ "object_stressed", 
+      condition == "b" ~ "verb_stressed",  
+      TRUE ~ NA_character_))%>%
+  mutate(
+    time_cats_words = case_when(
+      time_cats == 0 ~ "         ",
+      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 2 ~ "only",
+      time_cats == 3 ~ "verb1",
+      time_cats == 4 ~ "the1",
+      time_cats == 5 ~ "object1",
+      time_cats == 6 ~ "  ",
+      time_cats == 7 ~ "not",
+      time_cats == 8 ~ "verb2",
+      time_cats == 9 ~ "the2",
+      time_cats == 10 ~ "object2",
+      time_cats == 11 ~ " ",
+      time_cats == 12 ~ " ",
+      TRUE ~ NA_character_),
+    time_cats_words = factor(time_cats_words, levels = unique(time_cats_words)))
+  
+unique(fixation_proportions$experiment)
+fixation_proportions <- ge_data_mapped_clean %>%
+  #mutate(experiment_place=if_else(experiment=="data_exp_142778-v2","prolific","in-person"))%>%
+  mutate(experiment_group=if_else(experiment=="data_exp_213779-v3","Dutch","English"))%>%
+  group_by(condition, time_cats_words,experiment_group) %>%
+  summarize(
+    mean_target_looks = mean(target_looks),
+    mean_obj_comp_looks = mean(obj_comp_looks),
+    mean_verb_comp_looks = mean(verb_comp_looks),
+    mean_dist_looks = mean(dist_looks),
+    se_target_looks = sd(target_looks) / sqrt(n()),
+    se_obj_comp_looks = sd(obj_comp_looks) / sqrt(n()),
+    se_verb_comp_looks = sd(verb_comp_looks) / sqrt(n()),
+    se_dist_looks = sd(dist_looks) / sqrt(n())
+  ) %>%
+  # Pivot both mean and SE together in one step
+  pivot_longer(
+    cols = c(starts_with("mean_"), starts_with("se_")),
+    names_to = c("type", "category"),
+    names_sep = "_",
+    values_to = "value"
+  )%>%
+  pivot_wider(values_from = value,
+              names_from = type)%>%
+  mutate(fixation_proportion=mean)
+
+
+```
+
+
+
+```{r}
+#prolific
+fixation_proportions %>%
+  filter(experiment_group=="Dutch")%>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,experiment_group))) +
+  geom_point(aes(shape=experiment_group)) +
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_wrap(category ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+fixation_proportions %>%
+  filter(experiment_group=="Dutch")%>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category))) +
+  geom_point() +
+  geom_smooth()+
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_wrap(condition ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# You can now use `se_fixation_proportion` in your plot:
+fixation_proportions %>%
+  filter(experiment_group!="Dutch")%>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,experiment_group))) +
+  geom_point(aes(shape=experiment_group)) +
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_wrap(category ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+#inperson
+fixation_proportions %>%
+  filter(experiment_group!="Dutch")%>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category))) +
+  geom_point() +
+  geom_smooth()+
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_wrap(condition ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+```{r}
+# You can now use `se_fixation_proportion` in your plot:
+fixation_proportions %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,experiment_group))) +
+  geom_point(aes(shape=experiment_group)) +
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_grid(experiment_group~category) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+fixation_proportions %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category,experiment_group))) +
+  geom_point() +
+  geom_smooth(aes(linetype=experiment_group))+
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_grid(condition ~ experiment_group) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+```{r}
+
+fixation_proportions3 <- ge_data_mapped_clean %>%
+  mutate(experiment_group=if_else(experiment=="data_exp_213779-v3","Dutch","English"))%>%
+  group_by(condition, time_cats_words,participant.private.id,experiment_group) %>%
+  summarize(
+    mean_target_looks = mean(target_looks),
+    mean_obj_comp_looks = mean(obj_comp_looks),
+    mean_verb_comp_looks = mean(verb_comp_looks),
+    mean_dist_looks = mean(dist_looks)
+  ) %>%
+  pivot_longer(
+    cols = starts_with("mean_"),
+    names_to = "category",
+    values_to = "fixation_proportion"
+  ) %>%
+  mutate(
+    category = str_replace(category, "mean_", "")
+  )
+
+# You can now use `se_fixation_proportion` in your plot:
+fixation_proportions3 %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,participant.private.id))) +
+  geom_point() +
+  geom_line(alpha = .25) +
+  facet_grid(experiment_group~category) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+
+
+```{r}
+fixation_proportions_ind <- ge_data_mapped_clean %>%
+  mutate(experiment_group=if_else(experiment=="data_exp_213779-v3","Dutch","English"))%>%
+  group_by(condition, time_cats_words,participant.private.id,experiment_group) %>%
+  summarize(
+    mean_target_looks = mean(target_looks),
+    mean_obj_comp_looks = mean(obj_comp_looks),
+    mean_verb_comp_looks = mean(verb_comp_looks),
+    mean_dist_looks = mean(dist_looks),
+    se_target_looks = sd(target_looks) / sqrt(n()),
+    se_obj_comp_looks = sd(obj_comp_looks) / sqrt(n()),
+    se_verb_comp_looks = sd(verb_comp_looks) / sqrt(n()),
+    se_dist_looks = sd(dist_looks) / sqrt(n())
+  ) %>%
+  # Pivot both mean and SE together in one step
+  pivot_longer(
+    cols = c(starts_with("mean_"), starts_with("se_")),
+    names_to = c("type", "category"),
+    names_sep = "_",
+    values_to = "value"
+  )%>%
+  pivot_wider(values_from = value,
+              names_from = type)%>%
+  mutate(fixation_proportion=mean)
+
+
+# You can now use `se_fixation_proportion` in your plot:
+fixation_proportions_ind %>%
+  ggplot(aes(x = time_cats_words, 
+             y = fixation_proportion, 
+             color = condition, 
+             group = interaction(condition, participant.private.id))) +
+  geom_point(aes(shape = participant.private.id), show.legend = FALSE) +
+  geom_line(alpha = 0.25, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5, show.legend = FALSE) +
+  facet_wrap(category ~ .) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        legend.position = "none")  # This removes the legend completely
+
+fixation_proportions_ind %>%
+  ggplot(aes(x = time_cats_words, 
+             y = fixation_proportion, 
+             color = condition, 
+             group = interaction(condition,time_cats_words))) +
+  geom_jitter(aes(), show.legend = FALSE) +
+  geom_boxplot()+
+  facet_grid(experiment_group~category) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        legend.position = "none") 
+```
+

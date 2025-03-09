@@ -1,0 +1,106 @@
+---
+title: "praat_pull"
+author: "Adam A. Bramlett"
+date: "2025-01-29"
+output: html_document
+---
+#set up r environment
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(reticulate)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(readr)
+
+source("r_parselmouth_functions.R")
+```
+
+#check for/make python environment and load python functions
+```{r}
+env_name <- "r-reticulate_focr"
+check_or_create_conda_env(env_name)
+reticulate::py_run_file("python_parselmouth_functions.py")
+```
+
+#set up python environemnt
+```{python}
+import os
+import parselmouth
+import os
+import numpy as np
+import simpleaudio as sa
+import pandas as pd
+import tgt
+```
+
+#define audio and textgrid pathways
+```{r}
+audio_path<-"../experiment/Audio stimuli"
+textgrid_path<-audio_path
+```
+
+#pull data of all sound files
+```{r}
+#sound first
+sounds_dictionary<-py$sounds_dict(audio_path)
+
+full_dictionary<-py$tgs_dict(textgrid_path,sounds_dictionary)
+
+filtered_dictionary <- full_dictionary[grepl("^[ba]", names(full_dictionary))]
+
+split_dictionary<-py$split_sounds(filtered_dictionary)
+
+split_dictionary$b19$split_sounds$t1$`1`
+
+sound_files<-extract_sounds_with_names(split_dictionary)
+
+filtered_dictionary$b19$sound
+
+split_dictionary$b19$split_sounds
+
+py$play_sound(sound_files$sound[[5]])
+sound_files$name
+
+```
+#extract onset and offset
+```{r}
+start_times <- list()
+end_times <- list()
+sound_names <- list()
+
+# Iterate through the sound objects and names in r.sound_files
+for (i in 1:length(sound_files$sound)) {
+  sound <- sound_files$sound[[i]]  # Access the sound object
+  name <- sound_files$name[[i]]    # Access the name
+  
+  # Append the start time, end time, and name to their respective lists
+  start_times <- append(start_times, sound$start_time)
+  end_times <- append(end_times, sound$end_time)
+  sound_names <- append(sound_names, name)
+}
+
+time_course <- data.frame(sound_names = unlist(sound_names),
+                          start_times = unlist(start_times),
+                          end_times = unlist(end_times))
+
+time_course
+```
+
+```{r}
+new_directory <- "../data"
+
+if (dir.exists(new_directory)) {
+  print("Directory already exists.")
+} else {
+  # Create the new directory
+  dir.create(new_directory)
+  print("Directory created successfully!")
+}
+
+
+write.csv(time_course, "../data/time_course.csv", row.names = FALSE)
+
+```
+

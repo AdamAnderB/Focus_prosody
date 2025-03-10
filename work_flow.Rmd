@@ -203,24 +203,33 @@ lang_back_remove<-lang_back_simple%>%
 ```{r}
 battery<-rbind(data_list$battery_up_dur,data_list$battery_up_formants,data_list$battery_up_ptich,data_list$battery_up_risetime)
 
-
 battery_tidy<-battery%>%
   rename_with(tolower)%>%
   ungroup()%>%
- select(participant.private.id,tree.node.key,task.name,screen.name,screen.number,display,reaction.time,response,sound1,sound2,base1,base2,same)%>%
+ select(participant.private.id,experiment,tree.node.key,task.name,screen.name,screen.number,display,reaction.time,response,sound1,sound2,base1,base2,same)%>%
   filter(display=="block" &screen.name == "Screen 3")%>%
   mutate(responses=case_when(response == "'z'"~1,
                              response == "'m'"~0),
          correct=if_else(responses==same,1,0),
          difference=abs(as.numeric(base1)-as.numeric(base2)))
 
-
 mad_standard=3
 
-battery_cleaned<-battery_tidy%>%
+battery_in_person<-battery%>%
+  rename_with(tolower)%>%
+  ungroup()%>%
+ select(participant.private.id,experiment,tree.node.key,task.name,screen.name,screen.number,display,reaction.time,response,sound1,sound2,base1,base2,same)%>%
+  filter(display=="block" &screen.name == "Screen 3")%>%
+  mutate(responses=case_when(response == "'z'"~1,
+                             response == "'m'"~0),
+         correct=if_else(responses==same,1,0),
+         difference=abs(as.numeric(base1)-as.numeric(base2)))%>%
+  filter(experiment=="data_exp_141883-v12"|
+           experiment=="data_exp_161097-v1")%>%
   dplyr::filter(reaction.time>200)%>%
-  filter(!is.na(correct))%>%
-  mutate(log_rt=sqrt(as.numeric(reaction.time)))%>%
+  #filter(!is.na(correct))%>%
+  mutate(correct = ifelse(is.na(correct), 0, correct),
+         log_rt=sqrt(as.numeric(reaction.time)))%>%
   mutate(display_medians = median(log_rt),
          abs_distance = abs(display_medians-log_rt),
          mean_distance = mean(abs_distance),
@@ -229,6 +238,51 @@ battery_cleaned<-battery_tidy%>%
   group_by(participant.private.id)%>%
   mutate(participants_medians = median(log_rt))%>%
   dplyr::filter(log_rt<upper_mad &log_rt>lower_mad)
+  
+View(battery_online)
+
+battery_online<-battery%>%
+  rename_with(tolower)%>%
+  ungroup()%>%
+  dplyr::filter(experiment!="data_exp_141883-v12"&
+           experiment!="data_exp_161097-v1")
+ select(participant.private.id,experiment,tree.node.key,task.name,screen.name,screen.number,display,reaction.time,response,sound1,sound2,base1,base2,same)
+  filter(display=="block" &screen.name == "Screen 3")
+  mutate(responses=case_when(response == "'z'"~1,
+                             response == "'m'"~0),
+         correct=if_else(responses==same,1,0),
+         difference=abs(as.numeric(base1)-as.numeric(base2)))
+  dplyr::filter(reaction.time>200)%>%
+  #filter(!is.na(correct))%>%
+  mutate(correct = ifelse(is.na(correct), 0, correct),
+         log_rt=sqrt(as.numeric(reaction.time)))%>%
+  mutate(display_medians = median(log_rt),
+         abs_distance = abs(display_medians-log_rt),
+         mean_distance = mean(abs_distance),
+         upper_mad = display_medians+(mean_distance*mad_standard),
+         lower_mad = display_medians-(mean_distance*mad_standard))%>%
+  group_by(participant.private.id)%>%
+  mutate(participants_medians = median(log_rt))%>%
+  dplyr::filter(log_rt<upper_mad &log_rt>lower_mad)
+  
+View(battery_online)  
+  
+mad_standard=3
+
+battery_cleaned<-battery_tidy%>%
+  dplyr::filter(reaction.time>200)%>%
+  #filter(!is.na(correct))%>%
+  mutate(correct = ifelse(is.na(correct), 0, correct),
+         log_rt=sqrt(as.numeric(reaction.time)))%>%
+  mutate(display_medians = median(log_rt),
+         abs_distance = abs(display_medians-log_rt),
+         mean_distance = mean(abs_distance),
+         upper_mad = display_medians+(mean_distance*mad_standard),
+         lower_mad = display_medians-(mean_distance*mad_standard))%>%
+  group_by(participant.private.id)%>%
+  mutate(participants_medians = median(log_rt))%>%
+  dplyr::filter(log_rt<upper_mad &log_rt>lower_mad)
+
 
 battery_cleaned%>%ggplot(aes(x=log_rt))+
   geom_histogram()+
@@ -240,6 +294,17 @@ battery_cleaned%>%ggplot(aes(x=factor(participant.private.id),y=participants_med
   geom_point()+
   geom_point(aes(y=upper_mad,x=factor(participant.private.id)),color="red")+
   geom_point(aes(y=lower_mad,x=factor(participant.private.id)),color="blue")
+
+battery_agg_agg<-battery_cleaned%>%
+  group_by(participant.private.id,experiment,task.name)%>%
+  summarize(mean=mean(correct))
+  
+battery_agg_agg%>%ggplot(aes(x=participant.private.id,y=mean))+
+  geom_point()+
+  facet_wrap(task.name~experiment)
+```
+
+```{r}
 
 battery_cleaned_part_agg<-battery_cleaned%>%
   group_by(participant.private.id)%>%
@@ -288,14 +353,22 @@ battery_cleaned_item_agg%>%
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+facet_grid(.~task.name)
 
 battery_agg2<-battery_cleaned%>%
-  group_by(participant.private.id, task.name) %>%
+  group_by(participant.private.id, task.name,experiment) %>%
   summarize(score=mean(correct))
+
+View(battery_tidy)
+View(battery_agg2)
 
 battery_agg2%>%ggplot(aes(x=task.name,y=score,color=factor(task.name)))+
   geom_boxplot()+
   geom_jitter()+
   theme_minimal()
 
+
+battery_agg_agg<-battery_agg%>%
+  group_by(participant.private.id,task.name)%>%
+  count()
+#here
 battery_agg<-battery_cleaned%>%
   filter(!is.na(response))%>%
   mutate(
@@ -322,7 +395,6 @@ battery_agg<-battery_cleaned%>%
                         f_a_count + c_r_count)$c)%>%
   select(participant.private.id, task.name, dprime, c)
 
-
 battery_agg%>%ggplot(aes(x=factor(task.name),y=dprime,color=factor(task.name),alpha=.4))+
   geom_line(aes(group=factor(participant.private.id)),color="black")+
   geom_violin()+
@@ -338,13 +410,13 @@ battery_agg%>%ggplot(aes(x=c,y=dprime,color=factor(task.name)))+
 battery_agg_wider<-battery_agg%>%
   pivot_wider(names_from = task.name,values_from = c(dprime:c))
 
+
 battery_agg_wider_simp<-battery_agg_wider
 ggpairs(battery_agg_wider_simp%>%select(!participant.private.id))
 
-
-initial_participants <- battery_agg_wider_simp$participant.private.id
-
 battery_agg_wider_simp<-battery_agg_wider_simp%>%filter(participant.private.id%in%battery_cleaned_part_agg_filtered$participant.private.id)
+
+View(battery_agg_wider)
 ```
 
 ```{r}
@@ -989,12 +1061,15 @@ cleaned_rhythm_agg_simp<-data_rhythm_complete%>%
   summarize(beat_score = mean(beats_correct))%>%
   rename(participant.private.id=Participant.Private.ID)
 
+View(cleaned_rhythm_agg_simp)
 ```
 
 ```{r}
 flanker<-data_list$Flanker_Task%>%
   rename_with(tolower)
 
+
+length(unique(flanker_cleaned$participant.private.id))
 flanker_cleaned<-flanker%>%
   filter(participant.private.id%in%digit_cleaned$participant.private.id)%>%
   select(participant.private.id,tree.node.key,task.name,display,
@@ -1059,14 +1134,14 @@ flanker_alpha<-cronbach_result$alpha
 # Check if accuracy contains only 0s and 1s
 table(flanker_cleaned$accuracy)
 
+library(brms)
 
-
-#ddm_model <- brm(
-#  bf(reaction.time | dec(accuracy) ~ 1 + congruency + (1 | #participant.private.id)),
-#  data = flanker_cleaned,
-#  family = wiener(),
-#  cores = 4, iter = 2000, warmup = 1000, chains = 4
-#)
+ddm_model <- brm(
+  bf(reaction.time | dec(accuracy) ~ 1 + congruency + (1 | participant.private.id)),
+  data = flanker_cleaned,
+  family = wiener(),
+  cores = 4, iter = 10000, warmup = 1000, chains = 4
+)
 
 save_ddm_model <- function(model, prefix = "ddm_output") {
   # Get a list of existing files matching the pattern
@@ -1108,9 +1183,9 @@ load_ddm_model <- function(prefix = "ddm_output") {
 }
 
 
-
+ddm_model_10<-ddm_model
 # save fit  model:
-#save_ddm_model(ddm_model)
+save_ddm_model(ddm_model_10)
 
 # Load the most recent model into ddm_model
 ddm_model <- load_ddm_model()
@@ -1203,6 +1278,8 @@ ind_diff_acoust_longer <- ind_diff_scaled %>%
   pivot_longer(cols = c("mean_working_memory", "lextale_score", "drift_rate",starts_with("dprime"), "melody_score", "beat_score"),
                names_to = "cog_measures",
                values_to = "scores")
+
+View(ind_diff_acoust_longer)
 ```
 
 
@@ -1213,6 +1290,28 @@ ind_diff_raw_longer<-ind_diff_simp%>%
                names_to = "cog_measures",
                values_to = "scores")
   
+ordered_measures <- c("dprime_battery_up_dur", 
+                      "dprime_battery_up_formants", 
+                      "dprime_battery_up_ptich", 
+                      "dprime_battery_up_risetime", 
+                      "mean_working_memory", 
+                      "lextale_score", 
+                      "drift_rate",
+                      "melody_score", 
+                      "beat_score") 
+
+cog_measure_labels <- c(
+  "dprime_battery_up_dur" = "Duration d'",
+  "dprime_battery_up_formants" = "Formants d'",
+  "dprime_battery_up_ptich" = "Pitch d'",
+  "dprime_battery_up_risetime" = "Risetime d'",
+  "mean_working_memory" = "Work-mem",
+  "lextale_score" = "LexTALE",
+    "drift_rate" = "Drift rate",
+  "melody_score" = "Melody",
+  "beat_score" = "Rhythm"
+)
+
 ind_diff_raw_longer2 <-ind_diff_raw_longer %>%
   mutate(cog_measures = factor(cog_measures, levels = ordered_measures),
          cog_measures_num=as.numeric(cog_measures)) %>% 
@@ -1224,15 +1323,7 @@ ind_diff_acoust_longer <- ind_diff_scaled %>%
                names_to = "cog_measures",
                values_to = "scores")
 
-ordered_measures <- c("dprime_battery_up_dur", 
-                      "dprime_battery_up_formants", 
-                      "dprime_battery_up_ptich", 
-                      "dprime_battery_up_risetime", 
-                      "mean_working_memory", 
-                      "lextale_score", 
-                      "drift_rate",
-                      "melody_score", 
-                      "beat_score") 
+
 
 ind_diff_acoust_longer2 <- ind_diff_acoust_longer %>%
   mutate(cog_measures = factor(cog_measures, levels = ordered_measures),
@@ -1351,14 +1442,26 @@ ind_diff_acoust_longer3$cog_measures <- factor(
 
 strip_color_map <- category_colors[names(category_colors) %in% unique(ind_diff_raw_longer2$cog_measures)]
 
+library(gghalves)
+View(ind_diff_acoust_longer3)
+
+ggplot(ind_diff_raw_longer2 %>% filter(cog_measures == unique(ind_diff_raw_longer2$cog_measures)[1]), 
+       aes(x = 0, y = scores)) +
+  geom_half_violin(aes(fill = exp, group = interaction(exp, cog_measures)), 
+                   color = "white", alpha = .8, position = "identity", side = "right") +
+  geom_jitter(aes(x = -0.25, color = exp), alpha = .3, size = 1, width = 0.05, height = 0) +
+  theme_minimal()
+
 
 plots <- lapply(unique(ind_diff_raw_longer2$cog_measures), function(measure) {
+  print(paste("Processing measure:", measure))  # Debugging step
+
   ggplot(ind_diff_raw_longer2 %>% filter(cog_measures == measure), 
          aes(x = 0, y = scores)) +
     
     geom_half_violin(aes(fill = exp, group = interaction(exp, cog_measures)), 
-                     color = "white", alpha = .8, position = "identity", side = "r") +
-
+                     color = "white", alpha = .8, position = "identity", side = "right") +
+    
     geom_jitter(aes(x = -0.25, color = exp), alpha = .3, size = 1, width = 0.05, height = 0) +
     
     theme_minimal() +
@@ -1366,7 +1469,6 @@ plots <- lapply(unique(ind_diff_raw_longer2$cog_measures), function(measure) {
       axis.text.y = element_blank(),
       axis.ticks.y = element_blank(),
       legend.position = "bottom",
-      
       strip.background = element_rect(fill = NA, color = category_colors[measure], linewidth = 2),  
       strip.text = element_text(face = "bold", color = category_colors[measure])  
     ) +
@@ -1692,7 +1794,8 @@ combined_plot <- plot_grid(
 
 combined_plot
 
-ggsave("combined_plot_circle.pdf", combined_plot, width = 12, height = 14, dpi = 300)
+ggsave("viz/combined_plot_circle.pdf", combined_plot, width = 12, height = 14, dpi = 300)
+ggsave("viz/combined_plot_circle.png", combined_plot, width = 12, height = 14, dpi = 300)
 ```
 
 ```{r}

@@ -62,7 +62,7 @@ split_dictionary$b19$split_sounds
 
 py$play_sound(sound_files$sound[[5]])
 sound_files$name
-
+filtered_dictionary$
 ```
 #extract onset and offset
 ```{r}

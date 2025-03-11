@@ -112,7 +112,7 @@ write.csv(time_course, "../data/time_course.csv", row.names = FALSE)
 ```
 
 ```{r}
-
+acoustic_measures_df$static_measures
 
 acoustic_measures_df$pitch_data
 acoustic_measures_df$static_measures

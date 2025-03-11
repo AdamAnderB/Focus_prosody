@@ -1005,7 +1005,6 @@ flanker<-data_list$Flanker_Task%>%
   rename_with(tolower)
 
 
-length(unique(flanker_cleaned$participant.private.id))
 flanker_cleaned<-flanker%>%
   filter(participant.private.id%in%digit_cleaned$participant.private.id)%>%
   select(participant.private.id,tree.node.key,task.name,display,
@@ -1119,7 +1118,7 @@ load_ddm_model <- function(prefix = "ddm_output") {
 }
 
 
-ddm_model_10<-ddm_model
+#ddm_model_10<-ddm_model
 # save fit  model:
 save_ddm_model(ddm_model_10)
 
@@ -1164,7 +1163,7 @@ part_keep_rem_agg <- part_keep_rem %>%
 
 part_keep_rem_agg_lang_stand<-part_keep_rem_agg%>%
   filter(mean_presence==1)
-
+write.csv(part_keep_rem_agg_lang_stand, "part_keep.csv", row.names = FALSE)
 ```
 
 ```{r}
@@ -1179,6 +1178,7 @@ cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,lextale_cb_a
 cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,melody_cronbach_alpha)
 cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,rhythm_cronbach_alpha)
 cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,flanker_alpha)
+write.csv(cronbachs_alpha, "cronbachs_alpha.csv", row.names = FALSE)
 ```
 
 ```{r}
@@ -1992,7 +1992,6 @@ ge_estimates$whos<-"Ge et al. (2021)"
 
 fixation_proportions$whos<-"Ours"
 
-
 all_fixations<-rbind(fixation_proportions,ge_estimates)
 
 all_fixations$time_cats_words <- factor(all_fixations$time_cats_words, 
@@ -2068,51 +2067,72 @@ english_fix<-all_fixations %>%
   guides(color = guide_legend(title = "Condition:"),
        linetype = guide_legend(title = "Language:"))
 
+english_fix
 ggsave("viz/dutch_fix.png", dutch_fix, width = 10, height = 6, dpi = 300)
 ggsave("viz/english_fix.png", english_fix, width = 10, height = 6, dpi = 300)
 ```
 
 ```{r}
-all_fixations %>%
-  filter(experiment_group=="Dutch")%>%
-  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category,whos))) +
+
+dutch_fix2<-all_fixations %>%
+  filter(experiment_group == "Dutch") %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category, whos))) +
   
-  geom_smooth(fill="black")+
-  geom_point(size=2,color="white") +
+  geom_smooth(fill = "black") +
+  geom_point(size = 2, color = "white") +
   geom_point() +
   geom_line(alpha = .25) +
   geom_errorbar(aes(ymin = fixation_proportion - se, 
                     ymax = fixation_proportion + se), 
                 width = 0.2, alpha = 0.5) +
-  facet_grid(whos~condition,scales = "free_y") +
+  facet_grid(whos ~ condition, scales = "free_y",
+             labeller = labeller(condition = c("verb_stressed" = "Verb Stressed",
+                                              "object_stressed" = "Object Stressed"))) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  scale_color_manual(values = c("#39FF14", "#FF10F0", "#FFFF33", "#9D00FF"))
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "English",
+       x = "",
+       y = "Fixation proportions") +
+  scale_color_manual(values = c("#39FF14", "#9D00FF", "#FFFF33","#FF10F0"),
+                     labels = c("dist" = "Distractor",
+                                "target" = "Target",
+                                "obj" = "Object Stressed Competitor",
+                                "verb" = "Verb Stressed Competitor"))
+
 
 #inperson
-all_fixations %>%
-  filter(experiment_group!="Dutch")%>%
-  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category,whos))) +
+english_fix2<-all_fixations %>%
+  filter(experiment_group != "Dutch") %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category, whos))) +
   
-  geom_smooth(fill="grey80")+
-  geom_point(size=2,color="white") +
+  geom_smooth(fill = "grey80") +
+  geom_point(size = 2, color = "white") +
   geom_point() +
   geom_line(alpha = .25) +
   geom_errorbar(aes(ymin = fixation_proportion - se, 
                     ymax = fixation_proportion + se), 
                 width = 0.2, alpha = 0.5) +
-  facet_grid(whos~condition,scales = "free_y") +
+  facet_grid(whos ~ condition, scales = "free_y",
+             labeller = labeller(condition = c("verb_stressed" = "Verb Stressed",
+                                              "object_stressed" = "Object Stressed"))) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  scale_color_manual(values = c("#39FF14", "#FF10F0", "#FFFF33", "#9D00FF"))
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "English",
+       x = "",
+       y = "Fixation proportions") +
+  scale_color_manual(values = c("#39FF14", "#9D00FF", "#FFFF33","#FF10F0"),
+                     labels = c("dist" = "Distractor",
+                                "target" = "Target",
+                                "obj" = "Object Stressed Competitor",
+                                "verb" = "Verb Stressed Competitor"))
 
+ggsave("viz/dutch_fix2.png", dutch_fix2, width = 10, height = 10, dpi = 300)
+ggsave("viz/english_fix2.png", english_fix2, width = 10, height = 10, dpi = 300)
 ```
-```{r}
-ge_stats_summary<-read.csv("~/scripts/music_project_23/FoCr/data/ge_stats_summary3.csv")
-unique(ge_stats_summary$time_cats_words_names)
-View(ge_stats_summary)
 
-View(ge_data_mapped_clean)
+```{r}
 
 fixation_stats<- ge_data_mapped_clean %>%
   #mutate(experiment_place=if_else(experiment=="data_exp_142778-v2","prolific","in-person"))%>%
@@ -2163,9 +2183,13 @@ split_by_time_steps <- function(df) {
   return(grouped_data)
 }
 
+
+fixation_stats$condition <- factor(fixation_stats$condition, levels = c("object_stressed", setdiff(unique(fixation_stats$condition), "object_stressed")))
+
 # Apply the function to your dataset
 fixation_stats_list <- split_by_time_steps(fixation_stats)
-fixation_stats_list$time_Dutch_word_gap
+levels(fixation_stats_list$time_Dutch_word_gap$condition)
+unique(fixation_stats_list$time_Dutch_word_gap$condition)
 ```
 
 ```{r}
@@ -2220,10 +2244,18 @@ select_lmer_model <- function(df, dataset_name) {
   }
 
   model_variants <- list(
-    full = "lmer(fixation_proportion ~ AOI * condition + (1 + AOI * condition | participant.private.id), data = df, REML = FALSE)",
-    no_slope = "lmer(fixation_proportion ~ AOI * condition + (1 | participant.private.id), data = df, REML = FALSE)",
-    no_interaction = "lmer(fixation_proportion ~ AOI + condition + (1 | participant.private.id), data = df, REML = FALSE)",
-    random_intercept_only = "lmer(fixation_proportion ~ AOI + condition + (1 | participant.private.id), data = df, REML = FALSE)",
+    full = "lmer(fixation_proportion ~ AOI * condition + (1 + AOI * condition | participant.private.id), 
+                  data = df, REML = FALSE, 
+                  control = lmerControl(optimizer = 'bobyqa', optCtrl = list(maxfun = 100000)))",
+    no_slope = "lmer(fixation_proportion ~ AOI * condition + (1 | participant.private.id), 
+                       data = df, REML = FALSE, 
+                       control = lmerControl(optimizer = 'bobyqa', optCtrl = list(maxfun = 100000)))",
+    no_interaction = "lmer(fixation_proportion ~ AOI + condition + (1 | participant.private.id), 
+                             data = df, REML = FALSE, 
+                             control = lmerControl(optimizer = 'bobyqa', optCtrl = list(maxfun = 100000)))",
+    random_intercept_only = "lmer(fixation_proportion ~ AOI + condition + (1 | participant.private.id), 
+                                    data = df, REML = FALSE, 
+                                    control = lmerControl(optimizer = 'bobyqa', optCtrl = list(maxfun = 100000)))",
     lm_fallback = "lm(fixation_proportion ~ AOI * condition, data = df)"
   )
 
@@ -2239,7 +2271,7 @@ select_lmer_model <- function(df, dataset_name) {
 
       model_results[[model_name]] <- tibble(
         dataset_name = dataset_name,
-        formula = as.character(formula(model)),
+        formula = paste(deparse(formula(model)), collapse = " "),
         message = paste("Model attempted:", model_name),
         converged = converged,
         model_type = ifelse(inherits(model, "lmerMod"), "lmer", "lm"),
@@ -2280,14 +2312,297 @@ best_models <- fixation_model_results %>%
   ungroup()
 
 # Flatten the model summary columns
-best_models_flat <- best_models %>%
-  unnest(cols = c(fixed_effects, random_effects))
+library(purrr)
 
-# View results
-View(best_models_flat)
+# Unnest fixed effects first (since it always has 4 rows)
+best_model_flat <- best_models %>%
+  select(dataset_name, formula, model_type, fixed_effects) %>%
+  unnest(cols = fixed_effects, keep_empty = TRUE)
+
+best_models_flat <- best_model_flat %>%
+  mutate(
+    experiment_group = str_extract(dataset_name, "(?<=_)[^_]+"),  # Extract between first and second _
+    time_cats_words = str_extract(dataset_name, "[^_]+$")         # Extract after last _
+  )
+
+# Convert time_cats_words into a factor with the specified levels
+best_models_flat$time_cats_words <- factor(best_models_flat$time_cats_words, 
+  levels = c("The dinasaur is", "only", "verb1", "the1", 
+             "object1", "gap", "not", "verb2", "the2", "object2", "offset")
+)
+
+
+
+best_models_flat_cleaned<-best_models_flat%>%
+  select("time_cats_words","experiment_group","formula","model_type","term", "estimate","std.error","statistic","p.value")
+best_models_flat_cleaned$whos<-"Ours"
+
+ge_stats_summary<-read.csv("~/scripts/music_project_23/FoCr/data/ge_stats_summary3.csv")
+
+ge_stats_summary_cleaned <- ge_stats_summary %>%
+  rename(
+    time_cats_words = time_cats_words_names,
+    term = Predictor,
+    estimate = Estimate,
+    std.error = SE,
+    statistic = t.value,
+    p.value = p.value,
+    experiement_group = Language)%>%
+  mutate(time_cats_words=ifelse(time_cats_words=="offset500","offset",time_cats_words),
+         experiment_group=experiement_group)
+
+ge_stats_summary_cleaned$whos<-"Ge et al. (2021)"
+
+
+all_cols <- union(colnames(best_models_flat_cleaned), colnames(ge_stats_summary_cleaned))
+
+# Add missing columns with NA in both data frames
+best_models_flat_cleaned[setdiff(all_cols, colnames(best_models_flat_cleaned))] <- NA
+ge_stats_summary_cleaned[setdiff(all_cols, colnames(ge_stats_summary_cleaned))] <- NA
+
+# Reorder columns to match
+best_models_flat_cleaned <- best_models_flat_cleaned[, all_cols]
+ge_stats_summary_cleaned <- ge_stats_summary_cleaned[, all_cols]
 ```
 
+```{r}
+library(stringr)
 
+all_model_Data_viz <- rbind(best_models_flat_cleaned, ge_stats_summary_cleaned) %>%
+  mutate(
+    sig_level = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01 ~ "**",
+      p.value < 0.05 ~ "*",
+      TRUE ~ ""
+    ),
+    time_cats_words = factor(time_cats_words, 
+      levels = c("The dinasaur is", "only", "verb1", "the1", 
+                 "object1", "gap", "not", "verb2", "the2", "object2", "offset"))
+  )%>%
+  mutate(term = str_replace_all(as.character(term), "verb_comp_looks|verb_stressed", ""))%>%
+  mutate(term = str_replace_all(term, "condition", "Condition"))%>%
+  mutate(color = case_when(
+    term == "Condition" & estimate < 0 ~ "#0D47A1",  # Condition negative: Blue
+    term == "Condition" & estimate > 0 ~ "#FF6F00",  # Condition positive: Orange
+    term == "AOI" & estimate < 0 ~ "#9D00FF",        # AOI negative: Purple
+    term == "AOI" & estimate > 0 ~ "#FFFF33",        # AOI positive: Yellow
+    term =="(Intercept)"~"grey",
+    TRUE ~ "black"                                    # All others: Black
+  ))
+```
+
+```{r}
+# Plot
+# Updated Dutch plot
+model_plot_dutch <- all_model_Data_viz %>%
+  filter(experiment_group == "Dutch") %>%
+  ggplot(aes(x = term, y = estimate, color = color, fill = whos)) +  # Use custom color column
+  
+  # Add points with error bars
+  geom_point(size = 3, alpha = 0.7) +
+  geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error), width = 0.2, alpha = 0.7) +
+  
+  # Add significance labels
+  geom_text(aes(label = sig_level), vjust = -1, size = 4, color = "black") +
+  
+  # Titles and labels
+  labs(title = "Model Output Dutch",
+       x = "Predictor Terms", 
+       y = "Estimate", 
+       color = "Effect Type") +
+  
+  # Improve theme for readability
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(size = 14, face = "bold"),
+    legend.position="none"
+  ) +
+  
+  # Facet by time_cats_words
+  facet_grid(whos ~ time_cats_words, scales = "free_x", space = "free_x") +
+  
+  # Add reference line at zero
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.6) +
+  
+  # Apply manual color scale
+  scale_color_identity()
+
+# Updated English plot
+model_plot_english <- all_model_Data_viz %>%
+  filter(experiment_group == "English") %>%
+  ggplot(aes(x = term, y = estimate, color = color, fill = whos)) +  # Use custom color column
+  
+  # Add points with error bars
+  geom_point(size = 3, alpha = 0.7) +
+  geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error), width = 0.2, alpha = 0.7) +
+  
+  # Add significance labels
+  geom_text(aes(label = sig_level), vjust = -1, size = 4, color = "black") +
+  
+  # Titles and labels
+  labs(title = "Model Output English",
+       x = "Predictor Terms", 
+       y = "Estimate", 
+       color = "Effect Type") +
+  
+  # Improve theme for readability
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(size = 14, face = "bold"),
+    legend.position="none"
+  ) +
+  
+  # Facet by time_cats_words
+  facet_grid(whos ~ time_cats_words, scales = "free_x", space = "free_x") +
+  
+  # Add reference line at zero
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.6) +
+  
+  # Apply manual color scale
+  scale_color_identity()
+
+# Display plots
+
+model_plot_english
+model_plot_dutch
+
+
+ggsave("viz/model_plot_english.png", model_plot_english, width = 10, height = 5, dpi = 300)
+ggsave("viz/model_plot_dutch.png", model_plot_dutch, width = 10, height = 5, dpi = 300)
+```
+
+```{r}
+
+gam_stats<- ge_data_mapped_clean %>%
+  #mutate(experiment_place=if_else(experiment=="data_exp_142778-v2","prolific","in-person"))%>%
+  mutate(experiment_group=if_else(experiment=="data_exp_213779-v3","Dutch","English"))%>%
+  ungroup()%>%
+  select(participant.private.id,condition,time_cats,time_cats_words,
+         experiment_group,target_looks,obj_comp_looks,
+         verb_comp_looks,dist_looks,audio)%>%
+  pivot_longer(
+    cols = c(ends_with("_looks")),
+    names_to = c("category")
+  )%>%
+  mutate(time_cats_words = case_when(
+      time_cats == 0 ~ "         ",
+      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 2 ~ "only",
+      time_cats == 3 ~ "verb1",
+      time_cats == 4 ~ "the1",
+      time_cats == 5 ~ "object1",
+      time_cats == 6 ~ "gap",
+      time_cats == 7 ~ "not",
+      time_cats == 8 ~ "verb2",
+      time_cats == 9 ~ "the2",
+      time_cats == 10 ~ "object2",
+      time_cats == 11 ~ "offset",
+      time_cats == 12 ~ "offset",
+      TRUE ~ NA_character_))%>%
+    filter(time_cats_words=="The dinasaur is"|time_cats_words=="only"|
+             time_cats_words=="verb1"|time_cats_words=="the1"|
+             time_cats_words=="object1"|time_cats_words=="gap"|
+             time_cats_words=="not"|time_cats_words=="verb2"|
+             time_cats_words=="the2"|time_cats_words=="object2"|
+             time_cats_words=="offset")%>%
+  group_by(participant.private.id,condition,time_cats_words,time_cats,experiment_group,category)%>%
+  mutate(AOI=as.factor(category))%>%
+  mutate(
+    experiment_group = factor(experiment_group, levels = c("English", "Dutch")),
+    condition = factor(condition, levels = c("object_stressed", "verb_stressed")),
+    participant.private.id=as.factor(participant.private.id),
+    )%>%
+  mutate(value = as.numeric(as.character(value)))%>%
+  mutate(audio=as.factor(audio))
+  
+
+target_gam <- gam_stats %>% filter(AOI == "target_looks")%>%na.omit()
+
+competitor_gam <- gam_stats %>%
+  filter((condition == "verb_stressed" & AOI == "verb_comp_looks") |
+         (condition == "object_stressed" & AOI == "obj_comp_looks"))
+```
+
+```{r}
+library(mgcv)
+target_gam_model0 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group * condition +
+                         s(participant.private.id, bs = "re") + 
+                         s(audio, participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),  # Logistic regression
+                         data = target_gam,
+                         method = "fREML")
+
+
+# Summary of model
+summary(target_gam_model)
+
+target_gam_model1 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group * condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),  # Logistic regression
+                         data = target_gam,
+                         method = "fREML")
+
+
+
+# Summary of model
+summary(target_gam_model1)
+
+target_gam_model2 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group + condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),  # Logistic regression
+                         data = target_gam,
+                         method = "fREML")
+
+
+# Summary of model
+summary(target_gam_model2)
+
+```
+
+```{r}
+competitor_gam_model0 <- bam(value ~ s(time_cats,by = experiment_group) + time_cats*experiment_group * condition +
+                         s(participant.private.id, bs = "re") + 
+                         s(audio, participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),  # Logistic regression
+                         data = competitor_gam,
+                         method = "fREML")
+
+
+# Summary of model
+summary(competitor_gam_model)
+
+
+competitor_gam_model1 <- bam(value ~ s(time_cats,by = experiment_group) + time_cats*experiment_group * condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),  # Logistic regression
+                         data = competitor_gam,
+                         method = "fREML")
+
+
+# Summary of model
+summary(competitor_gam_model1)
+
+competitor_gam_model2 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group + condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),  # Logistic regression
+                         data = competitor_gam,
+                         method = "fREML")
+
+
+# Summary of model
+summary(competitor_gam_model2)
+
+
+
+
+```
 
 ```{r}
 fixation_proportions_ind <- ge_data_mapped_clean %>%

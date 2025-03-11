@@ -62,7 +62,12 @@ split_dictionary$b19$split_sounds
 
 py$play_sound(sound_files$sound[[5]])
 sound_files$name
-filtered_dictionary$
+  
+sound_files<-extract_sounds_with_names(split_dictionary)
+
+acoustic_dictionary<-py$acoustics(names=sound_files$name, sounds=sound_files$sound)
+acoustic_measures_df<-acoustic_measures(acoustic_dictionary)
+
 ```
 #extract onset and offset
 ```{r}
@@ -86,6 +91,8 @@ time_course <- data.frame(sound_names = unlist(sound_names),
                           end_times = unlist(end_times))
 
 time_course
+
+View(time_course)
 ```
 
 ```{r}
@@ -102,5 +109,111 @@ if (dir.exists(new_directory)) {
 
 write.csv(time_course, "../data/time_course.csv", row.names = FALSE)
 
+```
+
+```{r}
+
+
+acoustic_measures_df$pitch_data
+acoustic_measures_df$static_measures
+
+acoustic_measures_df$pitch_data
+acoustic_measures_df$static_measures
+
+
+acc_data<-acoustic_measures_df$pitch_data%>%
+  left_join(acoustic_measures_df$static_measures)%>%
+  mutate(time=time*1000)%>%
+  mutate(time_cats = sub(".*_", "", word))%>%
+  mutate(word_actual = sub("_.*", "", word))%>%
+  mutate(time_cats_words = case_when(
+      time_cats == 0 ~ "         ",
+      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 2 ~ "only",
+      time_cats == 3 ~ "verb1",
+      time_cats == 4 ~ "the1",
+      time_cats == 5 ~ "object1",
+      time_cats == 6 ~ "gap",
+      time_cats == 7 ~ "not",
+      time_cats == 8 ~ "verb2",
+      time_cats == 9 ~ "the2",
+      time_cats == 10 ~ "object2",
+      time_cats == 11 ~ "offset",
+      time_cats == 12 ~ "offset",
+      TRUE ~ NA_character_))%>%
+  mutate(time_cats_words = factor(time_cats_words, 
+                                  levels = c("         ", 
+                                             "The dinasaur is", "only", 
+                                             "verb1", "the1", "object1", "gap",
+                                             "not", "verb2", "the2", "object2",
+                                             "offset")))%>%
+  group_by(word_actual) %>%
+  mutate(time_modified = time - min(time, na.rm = TRUE)) %>%
+  ungroup()%>%
+  mutate(condition = case_when(
+    substr(word, 1, 1) == "b" ~ "Verb Focused",
+    substr(word, 1, 1) == "a" ~ "Object Focused",
+    TRUE ~ NA_character_  # Assign NA if neither A nor b
+  ))%>%
+  filter(frequency>0)%>%
+  mutate(sizer=as.factor(if_else(time_cats_words=="offset"|time_cats_words=="gap",0,1)))
+
+time_cats_boundaries <- acc_data %>%
+  group_by(time_cats_words) %>%
+  summarize(start_time = min(time_modified, na.rm = TRUE),
+            end_time = max(time_modified, na.rm = TRUE)) %>%
+  mutate(mid_time = (start_time + end_time) / 2) %>%  # Compute midpoint
+  ungroup() %>%
+  na.omit()
+
+
+acc_plot<-ggplot(acc_data, aes(x = time_modified, y = frequency, color = condition)) +
+  
+  # Add points but only for sizer == 1
+  geom_point(data = filter(acc_data, sizer == 1), size = 1, alpha = 0.2) +
+  geom_point(data = filter(acc_data, sizer == 1), size = .1, alpha = 0.7) +
+
+  # Add vertical lines at start and end of each time_cats_words section
+  geom_vline(data = time_cats_boundaries, aes(xintercept = start_time), 
+             color = "black", linetype = "dashed", size = 0.6) +
+  geom_vline(data = time_cats_boundaries, aes(xintercept = end_time), 
+             color = "black", linetype = "dashed", size = 0.6) +
+
+  # Customize colors for conditions
+  scale_color_manual(values = c("Verb Focused" = "#FF6F00", "Object Focused" = "#0D47A1")) +
+
+  # Titles and labels
+  labs(title = "Time-Modified Frequencies by Condition",
+       x = "Time Modified (ms)", 
+       y = "Frequency (Hz)", 
+       color = "Condition") +
+
+  # Improve theme for readability
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid.major = element_line(color = "gray90"),
+    panel.grid.minor = element_blank()
+  ) +
+
+  # Facet by time_cats_words with free x-scaling and adjusting panel width
+  facet_grid(. ~ time_cats_words, scales = "free_x", space = "free_x") +
+
+  # Set x-axis breaks every 0.5 seconds
+  scale_x_continuous(breaks = seq(0, max(acc_data$time_modified, na.rm = TRUE), by = 500)) +
+
+  # Remove space between facets
+  theme(panel.spacing = unit(0, "lines"),
+        legend.position = c(0.98, 0.98),  # (x, y) position in normalized plot coordinates
+    legend.justification = c(1, 1),  # Aligns legend box at the top-right
+
+    # Add black border around the legend
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.6),
+        strip.text = element_text(size = 14, face = "bold")  )+
+  labs(x= "Time (ms)",
+       title="")
+acc_plot
+
+ggsave("viz/accoustic.png", acc_plot, width = 20, height = 5, dpi = 300)
 ```
 

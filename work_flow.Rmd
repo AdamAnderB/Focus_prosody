@@ -215,60 +215,6 @@ battery_tidy<-battery%>%
 
 mad_standard=3
 
-battery_in_person<-battery%>%
-  rename_with(tolower)%>%
-  ungroup()%>%
- select(participant.private.id,experiment,tree.node.key,task.name,screen.name,screen.number,display,reaction.time,response,sound1,sound2,base1,base2,same)%>%
-  filter(display=="block" &screen.name == "Screen 3")%>%
-  mutate(responses=case_when(response == "'z'"~1,
-                             response == "'m'"~0),
-         correct=if_else(responses==same,1,0),
-         difference=abs(as.numeric(base1)-as.numeric(base2)))%>%
-  filter(experiment=="data_exp_141883-v12"|
-           experiment=="data_exp_161097-v1")%>%
-  dplyr::filter(reaction.time>200)%>%
-  #filter(!is.na(correct))%>%
-  mutate(correct = ifelse(is.na(correct), 0, correct),
-         log_rt=sqrt(as.numeric(reaction.time)))%>%
-  mutate(display_medians = median(log_rt),
-         abs_distance = abs(display_medians-log_rt),
-         mean_distance = mean(abs_distance),
-         upper_mad = display_medians+(mean_distance*mad_standard),
-         lower_mad = display_medians-(mean_distance*mad_standard))%>%
-  group_by(participant.private.id)%>%
-  mutate(participants_medians = median(log_rt))%>%
-  dplyr::filter(log_rt<upper_mad &log_rt>lower_mad)
-  
-View(battery_online)
-
-battery_online<-battery%>%
-  rename_with(tolower)%>%
-  ungroup()%>%
-  dplyr::filter(experiment!="data_exp_141883-v12"&
-           experiment!="data_exp_161097-v1")
- select(participant.private.id,experiment,tree.node.key,task.name,screen.name,screen.number,display,reaction.time,response,sound1,sound2,base1,base2,same)
-  filter(display=="block" &screen.name == "Screen 3")
-  mutate(responses=case_when(response == "'z'"~1,
-                             response == "'m'"~0),
-         correct=if_else(responses==same,1,0),
-         difference=abs(as.numeric(base1)-as.numeric(base2)))
-  dplyr::filter(reaction.time>200)%>%
-  #filter(!is.na(correct))%>%
-  mutate(correct = ifelse(is.na(correct), 0, correct),
-         log_rt=sqrt(as.numeric(reaction.time)))%>%
-  mutate(display_medians = median(log_rt),
-         abs_distance = abs(display_medians-log_rt),
-         mean_distance = mean(abs_distance),
-         upper_mad = display_medians+(mean_distance*mad_standard),
-         lower_mad = display_medians-(mean_distance*mad_standard))%>%
-  group_by(participant.private.id)%>%
-  mutate(participants_medians = median(log_rt))%>%
-  dplyr::filter(log_rt<upper_mad &log_rt>lower_mad)
-  
-View(battery_online)  
-  
-mad_standard=3
-
 battery_cleaned<-battery_tidy%>%
   dplyr::filter(reaction.time>200)%>%
   #filter(!is.na(correct))%>%
@@ -356,18 +302,12 @@ battery_agg2<-battery_cleaned%>%
   group_by(participant.private.id, task.name,experiment) %>%
   summarize(score=mean(correct))
 
-View(battery_tidy)
-View(battery_agg2)
-
 battery_agg2%>%ggplot(aes(x=task.name,y=score,color=factor(task.name)))+
   geom_boxplot()+
   geom_jitter()+
   theme_minimal()
 
 
-battery_agg_agg<-battery_agg%>%
-  group_by(participant.private.id,task.name)%>%
-  count()
 #here
 battery_agg<-battery_cleaned%>%
   filter(!is.na(response))%>%
@@ -415,8 +355,6 @@ battery_agg_wider_simp<-battery_agg_wider
 ggpairs(battery_agg_wider_simp%>%select(!participant.private.id))
 
 battery_agg_wider_simp<-battery_agg_wider_simp%>%filter(participant.private.id%in%battery_cleaned_part_agg_filtered$participant.private.id)
-
-View(battery_agg_wider)
 ```
 
 ```{r}
@@ -1060,8 +998,6 @@ cleaned_rhythm_agg_simp<-data_rhythm_complete%>%
   group_by(Participant.Private.ID)%>%
   summarize(beat_score = mean(beats_correct))%>%
   rename(participant.private.id=Participant.Private.ID)
-
-View(cleaned_rhythm_agg_simp)
 ```
 
 ```{r}
@@ -1136,12 +1072,12 @@ table(flanker_cleaned$accuracy)
 
 library(brms)
 
-ddm_model <- brm(
-  bf(reaction.time | dec(accuracy) ~ 1 + congruency + (1 | participant.private.id)),
-  data = flanker_cleaned,
-  family = wiener(),
-  cores = 4, iter = 10000, warmup = 1000, chains = 4
-)
+#ddm_model <- brm(
+#  bf(reaction.time | dec(accuracy) ~ 1 + congruency + (1 | participant.private.id)),
+#  data = flanker_cleaned,
+#  family = wiener(),
+#  cores = 4, iter = 10000, warmup = 1000, chains = 4
+#)
 
 save_ddm_model <- function(model, prefix = "ddm_output") {
   # Get a list of existing files matching the pattern
@@ -1211,6 +1147,7 @@ flanker_simp<-drift_rates_df%>%
 
 drift_comp%>%ggplot(aes(x=drift_rate,y=acc))+
   geom_point()
+
 ```
 
 
@@ -1224,6 +1161,10 @@ part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NUL
 
 part_keep_rem_agg <- part_keep_rem %>%
   mutate(mean_presence = rowMeans(select(., -participant.private.id), na.rm = TRUE))
+
+part_keep_rem_agg_lang_stand<-part_keep_rem_agg%>%
+  filter(mean_presence==1)
+
 ```
 
 ```{r}
@@ -1247,7 +1188,8 @@ ind_diff<-lang_back_simple%>%
   left_join(lextale_agg_cleaned_simp)%>%
   left_join(melody_agg_simp)%>%
   left_join(cleaned_rhythm_agg_simp)%>%
-  left_join(flanker_simp)
+  left_join(flanker_simp)%>%
+  filter(participant.private.id %in% part_keep_rem_agg_lang_stand$participant.private.id)
 
 ind_diff_simp<-ind_diff%>%
   select("participant.private.id", "age", "education",
@@ -1279,7 +1221,6 @@ ind_diff_acoust_longer <- ind_diff_scaled %>%
                names_to = "cog_measures",
                values_to = "scores")
 
-View(ind_diff_acoust_longer)
 ```
 
 
@@ -1443,7 +1384,6 @@ ind_diff_acoust_longer3$cog_measures <- factor(
 strip_color_map <- category_colors[names(category_colors) %in% unique(ind_diff_raw_longer2$cog_measures)]
 
 library(gghalves)
-View(ind_diff_acoust_longer3)
 
 ggplot(ind_diff_raw_longer2 %>% filter(cog_measures == unique(ind_diff_raw_longer2$cog_measures)[1]), 
        aes(x = 0, y = scores)) +
@@ -1485,7 +1425,7 @@ plots <- lapply(unique(ind_diff_raw_longer2$cog_measures), function(measure) {
     coord_flip()
 })
 
-
+library(patchwork)
 cog_measures_plot <- wrap_plots(plots, ncol = 1) + 
   plot_layout(guides = "collect") &  
   theme(legend.position = "bottom",  
@@ -1773,6 +1713,7 @@ background_plot
 
 
 ```{r}
+library(cowplot)
 stacked_plot <- plot_grid(
   p1, background_plot,
   nrow = 2, 
@@ -1958,7 +1899,6 @@ ge_data_mapped_clean<-ge_data_mapped%>%
       TRUE ~ NA_character_),
     time_cats_words = factor(time_cats_words, levels = unique(time_cats_words)))
   
-unique(fixation_proportions$experiment)
 fixation_proportions <- ge_data_mapped_clean %>%
   #mutate(experiment_place=if_else(experiment=="data_exp_142778-v2","prolific","in-person"))%>%
   mutate(experiment_group=if_else(experiment=="data_exp_213779-v3","Dutch","English"))%>%
@@ -1987,9 +1927,8 @@ fixation_proportions <- ge_data_mapped_clean %>%
 
 ```
 
-
-
 ```{r}
+
 #prolific
 fixation_proportions %>%
   filter(experiment_group=="Dutch")%>%
@@ -2046,62 +1985,307 @@ fixation_proportions %>%
 ```
 
 ```{r}
-# You can now use `se_fixation_proportion` in your plot:
-fixation_proportions %>%
-  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,experiment_group))) +
-  geom_point(aes(shape=experiment_group)) +
-  geom_line(alpha = .25) +
-  geom_errorbar(aes(ymin = fixation_proportion - se, 
-                    ymax = fixation_proportion + se), 
-                width = 0.2, alpha = 0.5) +
-  facet_grid(experiment_group~category) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+#list.files("../data/")
+#write.csv(fixation_proportions , file = file.path("../data", "fixation_proportions.csv"), row.names = FALSE)
+ge_estimates<-read.csv("../data/fixations_estimates_ge_et_al.csv")
+ge_estimates$whos<-"Ge et al. (2021)"
 
-fixation_proportions %>%
-  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category,experiment_group))) +
-  geom_point() +
-  geom_smooth(aes(linetype=experiment_group))+
-  geom_line(alpha = .25) +
-  geom_errorbar(aes(ymin = fixation_proportion - se, 
-                    ymax = fixation_proportion + se), 
-                width = 0.2, alpha = 0.5) +
-  facet_grid(condition ~ experiment_group) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+fixation_proportions$whos<-"Ours"
 
+
+all_fixations<-rbind(fixation_proportions,ge_estimates)
+
+all_fixations$time_cats_words <- factor(all_fixations$time_cats_words, 
+  levels = c("         ", "The dinasaur is", "only", "verb1", "the1", 
+             "object1", "  ", "not", "verb2", "the2", "object2", " "),
+  ordered = TRUE
+)
+```
+
+
+```{r}
+all_fixations <- all_fixations %>%
+  mutate(category = factor(category, levels = c("target", "obj", "verb", "dist")))
+
+dutch_fix<-all_fixations %>%
+  filter(experiment_group == "Dutch") %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, group = interaction(condition, experiment_group))) +
+  geom_line(color = "black", linewidth=1, alpha=.5, show.legend = FALSE) +
+  geom_point(aes(shape = experiment_group), color = "white", size=2) +
+  geom_point(aes(color = condition, shape = experiment_group)) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se, 
+                    color = condition), 
+                width = 0.2, alpha = 0.5) +
+  facet_grid(whos ~ category, scales = "free_x", space = "free",
+             labeller = labeller(category = c("dist" = "Distractor",
+                                              "target" = "Target",
+                                              "obj" = "Object Stressed Competitor",
+                                              "verb" = "Verb Stressed Competitor"))) +
+  theme_minimal() +
+  theme(
+    strip.placement = "outside",
+    strip.text.x = element_text(size = 12, face = "bold"), 
+    axis.text.x = element_text(angle = 90, hjust = 1), 
+    legend.position = "bottom",
+    legend.title = element_blank()
+  ) +
+  labs(y = "Fixation Proportion",
+       x = "") +  # Corrected way to rename the y-axis
+  scale_color_manual(values = c("#0D47A1", "#FF6F00"),
+                     labels = c("Object Stressed", "Verb Stressed"))+
+  guides(color = guide_legend(title = "Condition:"),
+       linetype = guide_legend(title = "Language:"))
+
+
+english_fix<-all_fixations %>%
+  filter(experiment_group != "Dutch") %>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, group = interaction(condition, experiment_group))) +
+  geom_line(color = "grey80", linewidth=1, alpha=.5, show.legend = FALSE) +
+  geom_point(aes(shape = experiment_group), color = "white", size=2) +
+  geom_point(aes(color = condition, shape = experiment_group)) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se, 
+                    color = condition), 
+                width = 0.2, alpha = 0.5) +
+  facet_grid(whos ~ category, scales = "free_x", space = "free",
+             labeller = labeller(category = c("dist" = "Distractor",
+                                              "target" = "Target",
+                                              "obj" = "Object Stressed Competitor",
+                                              "verb" = "Verb Stressed Competitor"))) +
+  theme_minimal() +
+  theme(
+    strip.placement = "outside",
+    strip.text.x = element_text(size = 12, face = "bold"), 
+    axis.text.x = element_text(angle = 90, hjust = 1), 
+    legend.position = "bottom",
+    legend.title = element_blank()
+  ) +
+  labs(y = "Fixation Proportion",
+       x = "") +  # Corrected way to rename the y-axis
+  scale_color_manual(values = c("#0D47A1", "#FF6F00"),
+                     labels = c("Object Stressed", "Verb Stressed"))+
+  guides(color = guide_legend(title = "Condition:"),
+       linetype = guide_legend(title = "Language:"))
+
+ggsave("viz/dutch_fix.png", dutch_fix, width = 10, height = 6, dpi = 300)
+ggsave("viz/english_fix.png", english_fix, width = 10, height = 6, dpi = 300)
 ```
 
 ```{r}
-
-fixation_proportions3 <- ge_data_mapped_clean %>%
-  mutate(experiment_group=if_else(experiment=="data_exp_213779-v3","Dutch","English"))%>%
-  group_by(condition, time_cats_words,participant.private.id,experiment_group) %>%
-  summarize(
-    mean_target_looks = mean(target_looks),
-    mean_obj_comp_looks = mean(obj_comp_looks),
-    mean_verb_comp_looks = mean(verb_comp_looks),
-    mean_dist_looks = mean(dist_looks)
-  ) %>%
-  pivot_longer(
-    cols = starts_with("mean_"),
-    names_to = "category",
-    values_to = "fixation_proportion"
-  ) %>%
-  mutate(
-    category = str_replace(category, "mean_", "")
-  )
-
-# You can now use `se_fixation_proportion` in your plot:
-fixation_proportions3 %>%
-  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,participant.private.id))) +
+all_fixations %>%
+  filter(experiment_group=="Dutch")%>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category,whos))) +
+  
+  geom_smooth(fill="black")+
+  geom_point(size=2,color="white") +
   geom_point() +
   geom_line(alpha = .25) +
-  facet_grid(experiment_group~category) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_grid(whos~condition,scales = "free_y") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  scale_color_manual(values = c("#39FF14", "#FF10F0", "#FFFF33", "#9D00FF"))
+
+#inperson
+all_fixations %>%
+  filter(experiment_group!="Dutch")%>%
+  ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category,whos))) +
+  
+  geom_smooth(fill="grey80")+
+  geom_point(size=2,color="white") +
+  geom_point() +
+  geom_line(alpha = .25) +
+  geom_errorbar(aes(ymin = fixation_proportion - se, 
+                    ymax = fixation_proportion + se), 
+                width = 0.2, alpha = 0.5) +
+  facet_grid(whos~condition,scales = "free_y") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  scale_color_manual(values = c("#39FF14", "#FF10F0", "#FFFF33", "#9D00FF"))
+
+```
+```{r}
+ge_stats_summary<-read.csv("~/scripts/music_project_23/FoCr/data/ge_stats_summary3.csv")
+unique(ge_stats_summary$time_cats_words_names)
+View(ge_stats_summary)
+
+View(ge_data_mapped_clean)
+
+fixation_stats<- ge_data_mapped_clean %>%
+  #mutate(experiment_place=if_else(experiment=="data_exp_142778-v2","prolific","in-person"))%>%
+  mutate(experiment_group=if_else(experiment=="data_exp_213779-v3","Dutch","English"))%>%
+  ungroup()%>%
+  select(participant.private.id,condition,time_cats,time_cats_words,
+         experiment_group,target_looks,obj_comp_looks,
+         verb_comp_looks,dist_looks)%>%
+  pivot_longer(
+    cols = c(ends_with("_looks")),
+    names_to = c("category")
+  )%>%
+  mutate(time_cats_words = case_when(
+      time_cats == 0 ~ "         ",
+      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 2 ~ "only",
+      time_cats == 3 ~ "verb1",
+      time_cats == 4 ~ "the1",
+      time_cats == 5 ~ "object1",
+      time_cats == 6 ~ "gap",
+      time_cats == 7 ~ "not",
+      time_cats == 8 ~ "verb2",
+      time_cats == 9 ~ "the2",
+      time_cats == 10 ~ "object2",
+      time_cats == 11 ~ "offset",
+      time_cats == 12 ~ "offset",
+      TRUE ~ NA_character_))%>%
+    filter(time_cats_words=="verb1"|time_cats_words=="the1"|
+             time_cats_words=="object1"|time_cats_words=="gap"|
+             time_cats_words=="not"|time_cats_words=="verb2"|
+             time_cats_words=="the2"|time_cats_words=="object2"|
+             time_cats_words=="offset")%>%
+  group_by(participant.private.id,condition,time_cats_words,time_cats,experiment_group,category)%>%
+  summarize(fixation_proportion=mean(value))%>%
+  filter(category=="obj_comp_looks"|category=="verb_comp_looks")%>%
+  mutate(AOI=as.factor(category))
+
+split_by_time_steps <- function(df) {
+  grouped_data <- df %>% group_by(experiment_group, time_cats_words) %>% group_split()
+  
+  # Extract unique names for each subset
+  names(grouped_data) <- df %>%
+    group_by(experiment_group, time_cats_words) %>%
+    summarise() %>%
+    mutate(name = paste0("time_", experiment_group, "_word_", time_cats_words)) %>%
+    pull(name)
+  
+  return(grouped_data)
+}
+
+# Apply the function to your dataset
+fixation_stats_list <- split_by_time_steps(fixation_stats)
+fixation_stats_list$time_Dutch_word_gap
 ```
 
+```{r}
+library(lme4)
+library(lmerTest)
+library(dplyr)
+library(broom.mixed)
+library(pbapply)
+library(tidyr)
+
+# Function to extract summary details from a model
+extract_model_summary <- function(model) {
+  if (is.null(model)) return(list(fixed_effects = NULL, random_effects = NULL, model_info = NULL))
+
+  model_type <- ifelse(inherits(model, "lmerMod"), "lmer", "lm")
+
+  # Extract fixed effects
+  fixed_effects <- tryCatch(tidy(model, effects = "fixed"), error = function(e) NULL)
+
+  # Extract random effects (only for lmer models)
+  random_effects <- if (model_type == "lmer") {
+    tryCatch(tidy(model, effects = "ran_pars"), error = function(e) NULL)
+  } else {
+    NULL
+  }
+
+  # Extract AIC, BIC, log-likelihood
+  model_info <- tryCatch(
+    glance(model) %>% select(AIC, BIC, logLik) %>% mutate(model_type = model_type),
+    error = function(e) NULL
+  )
+
+  return(list(
+    fixed_effects = fixed_effects,
+    random_effects = random_effects,
+    model_info = model_info
+  ))
+}
+
+# Function to select the best model
+select_lmer_model <- function(df, dataset_name) {
+  if (n_distinct(df$participant.private.id) < 2) {
+    return(tibble(
+      dataset_name = dataset_name,
+      formula = NA,
+      message = "Not enough data",
+      converged = FALSE,
+      AIC = NA, BIC = NA, logLik = NA,
+      fixed_effects = list(NULL),
+      random_effects = list(NULL)
+    ))
+  }
+
+  model_variants <- list(
+    full = "lmer(fixation_proportion ~ AOI * condition + (1 + AOI * condition | participant.private.id), data = df, REML = FALSE)",
+    no_slope = "lmer(fixation_proportion ~ AOI * condition + (1 | participant.private.id), data = df, REML = FALSE)",
+    no_interaction = "lmer(fixation_proportion ~ AOI + condition + (1 | participant.private.id), data = df, REML = FALSE)",
+    random_intercept_only = "lmer(fixation_proportion ~ AOI + condition + (1 | participant.private.id), data = df, REML = FALSE)",
+    lm_fallback = "lm(fixation_proportion ~ AOI * condition, data = df)"
+  )
+
+  model_results <- list()
+
+  for (model_name in names(model_variants)) {
+    model <- tryCatch(eval(parse(text = model_variants[[model_name]])), error = function(e) NULL)
+
+    if (!is.null(model)) {
+      converged <- ifelse(inherits(model, "lmerMod"), length(model@optinfo$conv$lme4$messages) == 0 && !isSingular(model), TRUE)
+      
+      model_summary <- extract_model_summary(model)
+
+      model_results[[model_name]] <- tibble(
+        dataset_name = dataset_name,
+        formula = as.character(formula(model)),
+        message = paste("Model attempted:", model_name),
+        converged = converged,
+        model_type = ifelse(inherits(model, "lmerMod"), "lmer", "lm"),
+        AIC = model_summary$model_info$AIC,
+        BIC = model_summary$model_info$BIC,
+        logLik = model_summary$model_info$logLik,
+        fixed_effects = list(model_summary$fixed_effects),
+        random_effects = list(model_summary$random_effects)
+      )
+
+      if (converged) {
+        model_results[[model_name]]$message <- paste("Selected model:", model_name)
+        break
+      }
+    }
+  }
+
+  return(bind_rows(model_results))
+}
+
+# Function to apply model selection to all datasets
+run_lmer_selection <- function(fixation_stats_list) {
+  results <- pblapply(names(fixation_stats_list), function(name) {
+    select_lmer_model(fixation_stats_list[[name]], dataset_name = name)
+  })
+  
+  return(bind_rows(results))
+}
+
+# Run model selection
+fixation_model_results <- run_lmer_selection(fixation_stats_list)
+
+# Select the best model for each dataset
+best_models <- fixation_model_results %>%
+  filter(converged == TRUE) %>%
+  group_by(dataset_name) %>%
+  slice_min(AIC, with_ties = FALSE) %>%
+  ungroup()
+
+# Flatten the model summary columns
+best_models_flat <- best_models %>%
+  unnest(cols = c(fixed_effects, random_effects))
+
+# View results
+View(best_models_flat)
+```
 
 
 

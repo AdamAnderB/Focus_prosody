@@ -194,6 +194,7 @@ lang_back_simple<-lang_back%>%
          lang_acquisition_order_1 = str_to_lower(lang_acquisition_order_1),
          lang_dominance_order_1 = str_to_lower(lang_dominance_order_1))
 
+View(lang_back_simple)
 lang_back_keep<-lang_back_simple%>%
   filter(exp==lang_dominance_order_1&exp==lang_dominance_order_1)
 lang_back_remove<-lang_back_simple%>%
@@ -1146,7 +1147,7 @@ flanker_simp<-drift_rates_df%>%
 
 drift_comp%>%ggplot(aes(x=drift_rate,y=acc))+
   geom_point()
-
+R.version.string
 ```
 
 
@@ -1157,13 +1158,24 @@ part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NUL
 part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, part_rhythm_agg)
 part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, part_melody_agg)
 part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, digit_cleaned)
-
 part_keep_rem_agg <- part_keep_rem %>%
   mutate(mean_presence = rowMeans(select(., -participant.private.id), na.rm = TRUE))
 
+
 part_keep_rem_agg_lang_stand<-part_keep_rem_agg%>%
   filter(mean_presence==1)
+
+colnames(part_keep_rem_agg_lang_stand)
+agg_removal<-part_keep_rem_agg%>%
+  pivot_longer(-participant.private.id,
+               names_to = "task",
+               values_to = "values")%>%
+  filter(values==0)%>%
+  group_by(task)%>%
+  count()
+
 write.csv(part_keep_rem_agg_lang_stand, "part_keep.csv", row.names = FALSE)
+write.csv(agg_removal, "agg_part_keep.csv", row.names = FALSE)
 ```
 
 ```{r}
@@ -1797,7 +1809,7 @@ ge_data<-ge_list_data_c%>%
            x_pred_normalised < 0 & y_pred_normalised <= 0 ~ "4",
            x_pred_normalised >= 0 & y_pred_normalised <= 0 ~ "3" ))
 
-
+nrow(ge_data)/nrow(ge_et_data)
 ge_data%>%ggplot(aes(x=x_pred_normalised,y=y_pred_normalised,color=quadrant))+
   geom_point()
 ```
@@ -1898,6 +1910,21 @@ ge_data_mapped_clean<-ge_data_mapped%>%
       time_cats == 12 ~ " ",
       TRUE ~ NA_character_),
     time_cats_words = factor(time_cats_words, levels = unique(time_cats_words)))
+
+View(ge_data_mapped_clean)
+frame_rate<-ge_data_mapped_clean%>%
+  group_by(participant.private.id,object)%>%
+  summarize(max_time=max(time),
+            min_time=min(time),
+            length=(max_time-min_time)/1000,
+            count=n())%>%
+  mutate(fr=count/length)
+
+
+frame_rate%>%ggplot(aes(x=participant.private.id,y=fr))+geom_point()+geom_violin()
+```
+
+```{r}
   
 fixation_proportions <- ge_data_mapped_clean %>%
   #mutate(experiment_place=if_else(experiment=="data_exp_142778-v2","prolific","in-person"))%>%

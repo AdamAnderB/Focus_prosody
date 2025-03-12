@@ -1706,7 +1706,7 @@ plot1
 ```{r}
 library(cowplot)
 
-background_plot <- (plot1 | plot2 | plot3) + plot_layout(guides = "collect") &
+background_plot <- (plot1 | plot3) + plot_layout(guides = "collect") &
   theme(legend.position = "none")
 background_plot
 ```
@@ -1884,7 +1884,7 @@ ge_data_mapped_clean<-ge_data_mapped%>%
   mutate(
     time_cats_words = case_when(
       time_cats == 0 ~ "         ",
-      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 1 ~ "The rabbit is", 
       time_cats == 2 ~ "only",
       time_cats == 3 ~ "verb1",
       time_cats == 4 ~ "the1",
@@ -1995,7 +1995,7 @@ fixation_proportions$whos<-"Ours"
 all_fixations<-rbind(fixation_proportions,ge_estimates)
 
 all_fixations$time_cats_words <- factor(all_fixations$time_cats_words, 
-  levels = c("         ", "The dinasaur is", "only", "verb1", "the1", 
+  levels = c("         ", "The rabbit is", "only", "verb1", "the1", 
              "object1", "  ", "not", "verb2", "the2", "object2", " "),
   ordered = TRUE
 )
@@ -2004,7 +2004,9 @@ all_fixations$time_cats_words <- factor(all_fixations$time_cats_words,
 
 ```{r}
 all_fixations <- all_fixations %>%
-  mutate(category = factor(category, levels = c("target", "obj", "verb", "dist")))
+  mutate(category = factor(category, levels = c("target", "obj", "verb", "dist")))%>%
+  na.omit()
+
 
 dutch_fix<-all_fixations %>%
   filter(experiment_group == "Dutch") %>%
@@ -2128,6 +2130,9 @@ english_fix2<-all_fixations %>%
                                 "obj" = "Object Stressed Competitor",
                                 "verb" = "Verb Stressed Competitor"))
 
+dutch_fix2
+english_fix2
+
 ggsave("viz/dutch_fix2.png", dutch_fix2, width = 10, height = 10, dpi = 300)
 ggsave("viz/english_fix2.png", english_fix2, width = 10, height = 10, dpi = 300)
 ```
@@ -2147,7 +2152,7 @@ fixation_stats<- ge_data_mapped_clean %>%
   )%>%
   mutate(time_cats_words = case_when(
       time_cats == 0 ~ "         ",
-      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 1 ~ "The rabbit is", 
       time_cats == 2 ~ "only",
       time_cats == 3 ~ "verb1",
       time_cats == 4 ~ "the1",
@@ -2327,7 +2332,7 @@ best_models_flat <- best_model_flat %>%
 
 # Convert time_cats_words into a factor with the specified levels
 best_models_flat$time_cats_words <- factor(best_models_flat$time_cats_words, 
-  levels = c("The dinasaur is", "only", "verb1", "the1", 
+  levels = c("The rabbit is", "only", "verb1", "the1", 
              "object1", "gap", "not", "verb2", "the2", "object2", "offset")
 )
 
@@ -2377,7 +2382,7 @@ all_model_Data_viz <- rbind(best_models_flat_cleaned, ge_stats_summary_cleaned) 
       TRUE ~ ""
     ),
     time_cats_words = factor(time_cats_words, 
-      levels = c("The dinasaur is", "only", "verb1", "the1", 
+      levels = c("The rabbit is", "only", "verb1", "the1", 
                  "object1", "gap", "not", "verb2", "the2", "object2", "offset"))
   )%>%
   mutate(term = str_replace_all(as.character(term), "verb_comp_looks|verb_stressed", ""))%>%
@@ -2438,7 +2443,7 @@ model_plot_english <- all_model_Data_viz %>%
   
   # Add points with error bars
   geom_point(size = 3, alpha = 0.7) +
-  geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error), width = 0.2, alpha = 0.7) +
+  geom_errorbar(aes(ymin = estimate - 1.96 *std.error, ymax = estimate + 1.96 *std.error), width = 0.2, alpha = 0.7) +
   
   # Add significance labels
   geom_text(aes(label = sig_level), vjust = -1, size = 4, color = "black") +
@@ -2493,7 +2498,7 @@ gam_stats<- ge_data_mapped_clean %>%
   )%>%
   mutate(time_cats_words = case_when(
       time_cats == 0 ~ "         ",
-      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 1 ~ "The rabbit is", 
       time_cats == 2 ~ "only",
       time_cats == 3 ~ "verb1",
       time_cats == 4 ~ "the1",
@@ -2506,7 +2511,7 @@ gam_stats<- ge_data_mapped_clean %>%
       time_cats == 11 ~ "offset",
       time_cats == 12 ~ "offset",
       TRUE ~ NA_character_))%>%
-    filter(time_cats_words=="The dinasaur is"|time_cats_words=="only"|
+    filter(time_cats_words=="The rabbit is"|time_cats_words=="only"|
              time_cats_words=="verb1"|time_cats_words=="the1"|
              time_cats_words=="object1"|time_cats_words=="gap"|
              time_cats_words=="not"|time_cats_words=="verb2"|
@@ -2520,89 +2525,620 @@ gam_stats<- ge_data_mapped_clean %>%
     participant.private.id=as.factor(participant.private.id),
     )%>%
   mutate(value = as.numeric(as.character(value)))%>%
-  mutate(audio=as.factor(audio))
+  mutate(audio=as.factor(audio))%>%
+  mutate(time_cats_words = factor(time_cats_words, 
+      levels = c("The rabbit is", "only", "verb1", "the1", 
+                 "object1", "gap", "not", "verb2", "the2", "object2","offset")))%>%
+  mutate(sentence_phase = as.factor(case_when(time_cats < 6~0,
+                                    time_cats>6~1)))%>%
+  filter(time_cats!=6)
   
 
 target_gam <- gam_stats %>% filter(AOI == "target_looks")%>%na.omit()
+target_gam_0<-target_gam%>%filter(sentence_phase==0)
+target_gam_1<-target_gam%>%filter(sentence_phase==1)
 
 competitor_gam <- gam_stats %>%
   filter((condition == "verb_stressed" & AOI == "verb_comp_looks") |
          (condition == "object_stressed" & AOI == "obj_comp_looks"))
+competitor_gam_0<-competitor_gam %>%filter(sentence_phase==0)
+competitor_gam_1<-competitor_gam %>%filter(sentence_phase==1)
+```
+
+```{r}
+#function for model selection
+choose_best_gam <- function(model1, model2, plot_smooth = TRUE) {
+  # Extract AIC and BIC for both models
+  aic_values <- AIC(model1, model2)
+  bic_values <- BIC(model1, model2)
+
+  # Select the best model (lower AIC is better)
+  if (aic_values$AIC[1] < aic_values$AIC[2]) {
+    best_model <- model1
+    best_model_name <- "Model 1"
+  } else {
+    best_model <- model2
+    best_model_name <- "Model 2"
+  }
+
+  # Print AIC/BIC values for comparison
+  print(aic_values)
+  print(bic_values)
+
+  # Ensure the function returns the best model object
+  message("Best model selected: ", best_model_name)
+  return(best_model)
+}
+
 ```
 
 ```{r}
 library(mgcv)
-target_gam_model0 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group * condition +
-                         s(participant.private.id, bs = "re") + 
-                         s(audio, participant.private.id, bs = "re"),
-                         family = binomial(link = "logit"),  # Logistic regression
-                         data = target_gam,
-                         method = "fREML")
+#target_gam_model0 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group * condition +
+#                         s(participant.private.id, bs = "re") + 
+#                         s(audio, participant.private.id, bs = "re"),
+#                         family = binomial(link = "logit"),  # Logistic regression
+#                         data = target_gam,
+#                         method = "fREML")
 
 
 # Summary of model
-summary(target_gam_model)
+#summary(target_gam_model)
 
-target_gam_model1 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group * condition +
+target_gam_model0_1 <- bam(value ~ time_cats * experiment_group * condition +
                          s(participant.private.id, bs = "re"),
-                         family = binomial(link = "logit"),  # Logistic regression
-                         data = target_gam,
+                         family = binomial(link = "logit"),
+                         data = target_gam_0,
                          method = "fREML")
 
 
 
 # Summary of model
-summary(target_gam_model1)
+summary(target_gam_model0_1)
 
-target_gam_model2 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group + condition +
+target_gam_model0_2 <- bam(value ~ time_cats + experiment_group + condition +
                          s(participant.private.id, bs = "re"),
-                         family = binomial(link = "logit"),  # Logistic regression
-                         data = target_gam,
+                         family = binomial(link = "logit"),
+                         data = target_gam_0,
                          method = "fREML")
 
 
 # Summary of model
-summary(target_gam_model2)
+summary(target_gam_model0_2)
+
+
+target_gam_model1_1 <- bam(value ~ time_cats * experiment_group * condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),
+                         data = target_gam_1,
+                         method = "fREML")
+
+
+
+# Summary of model
+summary(target_gam_model1_1)
+
+target_gam_model1_2 <- bam(value ~ time_cats + experiment_group + condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),
+                         data = target_gam_1,
+                         method = "fREML")
+
+# Summary of model
+summary(target_gam_model1_2)
+
+
+targ_0_best<-choose_best_gam(target_gam_model0_1,target_gam_model0_2)
+targ_1_best<-choose_best_gam(target_gam_model1_1,target_gam_model1_2)
+```
+
+```{r}
+#competitor_gam_model0 <- bam(value ~ s(time_cats,by = experiment_group) + time_cats*experiment_group * condition +
+#                         s(participant.private.id, bs = "re") + 
+#                         s(audio, participant.private.id, bs = "re"),
+#                         family = binomial(link = "logit"),  # Logistic regression
+#                         data = competitor_gam,
+#                         method = "fREML")
+
+
+# Summary of model
+#summary(competitor_gam_model)
+
+
+competitor_gam_model0_1 <- bam(value ~ time_cats * experiment_group * condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),
+                         data = competitor_gam_0,
+                         method = "fREML")
+
+
+
+# Summary of model
+summary(competitor_gam_model0_1)
+
+competitor_gam_model0_2 <- bam(value ~ time_cats + experiment_group + condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),
+                         data = competitor_gam_0,
+                         method = "fREML")
+
+
+# Summary of model
+summary(competitor_gam_model0_2)
+
+
+competitor_gam_model1_1 <- bam(value ~ time_cats * experiment_group * condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),
+                         data = competitor_gam_1,
+                         method = "fREML")
+
+
+
+# Summary of model
+summary(competitor_gam_model1_1)
+
+competitor_gam_model1_2 <- bam(value ~ time_cats + experiment_group + condition +
+                         s(participant.private.id, bs = "re"),
+                         family = binomial(link = "logit"),
+                         data = competitor_gam_1,
+                         method = "fREML")
+
+# Summary of model
+summary(competitor_gam_model1_2)
+
+
+comp_0_best<-choose_best_gam(competitor_gam_model0_1,competitor_gam_model0_2)
+comp_1_best<-choose_best_gam(competitor_gam_model1_1,competitor_gam_model1_2)
+```
+
+```{r}
+library(broom)
+library(broom.mixed)  # For handling GAMs properly
+
+# Extract parametric (fixed effect) terms
+targ_0_best_fixed_effects <- tidy(targ_0_best, parametric = TRUE) %>%
+  mutate(model = "targ_0_best")
+
+targ_1_best_fixed_effects <- tidy(targ_1_best, parametric = TRUE) %>%
+  mutate(model = "targ_1_best")
+
+comp_0_best_fixed_effects <- tidy(comp_0_best, parametric = TRUE) %>%
+  mutate(model = "comp_0_best")
+
+comp_1_best_fixed_effects <- tidy(comp_1_best, parametric = TRUE) %>%
+  mutate(model = "comp_1_best")
+
+all_best_fixed_effects <- bind_rows(
+  targ_0_best_fixed_effects,
+  targ_1_best_fixed_effects,
+  comp_0_best_fixed_effects,
+  comp_1_best_fixed_effects)%>%
+  
+  mutate(
+    Looks = str_extract(model, "^[^_]+"),  # Extracts the first part before "_"
+    Phrase = str_extract(model, "(?<=_)[^_]+"))%>%
+  mutate(
+    color = case_when(
+      term == "experiment_groupDutch" & estimate > 0 ~ "grey80",
+      term == "experiment_groupDutch" & estimate <= 0 ~ "black",  
+      term == "conditionverb_stressed" & estimate > 0 ~ "#FF6F00", 
+      term == "conditionverb_stressed" & estimate <= 0 ~ "#0D47A1", 
+      term == "time_cats:experiment_groupDutch" & estimate > 0 ~ "grey80", 
+      term == "time_cats:experiment_groupDutch" & estimate <= 0 ~ "black", 
+      term == "time_cats:conditionverb_stressed" & estimate > 0 ~ "#FF6F00",
+      term == "time_cats:conditionverb_stressed" & estimate <= 0 ~ "#0D47A1",
+      TRUE ~ "white"
+    )
+  )%>%
+  mutate(
+    term = case_when(
+      term == "(Intercept)" ~ "(Intercept)",
+      term == "time_cats" ~ "Time",
+      term == "experiment_groupDutch" ~ "L1",
+      term == "conditionverb_stressed" ~ "Stress",
+      term == "time_cats:experiment_groupDutch" ~ "Time:L1",
+      term == "time_cats:conditionverb_stressed" ~ "Time:Stress",
+      term == "experiment_groupDutch:conditionverb_stressed" ~ "L1:Stress",
+      term == "time_cats:experiment_groupDutch:conditionverb_stressed" ~ "Time:L1:Stress",
+      TRUE ~ term))%>%
+  mutate(
+    Looks = factor(Looks, levels = c("targ", "comp"), 
+                   labels = c("Target looks", "Competitor looks")),
+    Phrase = factor(Phrase, levels = c("0", "1"), 
+                    labels = c("The Rabbit is Verb1 the Object1", "Not Verb2 the Object2"))
+  )%>%
+  mutate(
+    sig_label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    )
+  )
+
+
+# Create plot
+gam_mod_out<-ggplot(all_best_fixed_effects, aes(x = term, y = estimate, color = color)) +
+  geom_errorbar(aes(ymin = estimate - 1.96 *std.error, ymax = estimate +1.96 * std.error), width = 0.4,color="black") +
+    geom_text(aes(label = sig_label,color=color), vjust = -0.5, size = 5, ) +  # Add significance stars
+
+  geom_point(size = 4,color="black") +
+  geom_point(size = 3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.6) +
+  labs(title = "",
+       x = "Model Terms", 
+       y = "Estimate") +
+  scale_color_identity() +  # Use predefined colors
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(size = 14, face = "bold")
+  ) +
+  facet_grid(Looks ~ Phrase)
+
+gam_mod_out
+ggsave("viz/gam_mod_out.png", gam_mod_out, width = 12, height = 6, dpi = 300)
+```
+
+#individual differences
+
+```{r}
+View(ind_diff_simp)
+
+scale_column <- function(x) {
+  mean_x <- mean(x, na.rm = TRUE)
+  max_abs_x <- max(abs(x - mean_x), na.rm = TRUE)  # Use max absolute deviation for scaling
+  if (max_abs_x == 0) {
+    return(rep(0, length(x)))  # Avoid division by zero if all values are identical
+  }
+  return((x - mean_x) / max_abs_x)
+}
+
+# Apply scaling to individual difference measures
+scaled_ind_diff <- ind_diff_simp %>%
+  select("participant.private.id", 
+         "dprime_battery_up_dur", "dprime_battery_up_formants",
+         "dprime_battery_up_ptich", "dprime_battery_up_risetime", 
+         "mean_working_memory", "lextale_score", "melody_score", 
+         "beat_score", "drift_rate") %>%
+  mutate(across(c("dprime_battery_up_dur", "dprime_battery_up_formants",
+                  "dprime_battery_up_ptich", "dprime_battery_up_risetime", 
+                  "mean_working_memory", "lextale_score", "melody_score", 
+                  "beat_score", "drift_rate"), scale_column))
+
+
+acc<-read.csv("../data/scaled_acoustics.csv")
+acc_cl<-acc%>%
+  mutate(
+    audio = as.factor(str_extract(word, "^[^_]+") %>% paste0(".wav")), 
+    time_cats = as.numeric(str_extract(word, "[^_]+$")))
+  
+id_stats<-gam_stats%>%
+  left_join(scaled_ind_diff)%>%
+  left_join(acc_cl)%>%
+  select("participant.private.id", 
+  "time_cats", "time_cats_words", 
+  "experiment_group", "audio", 
+  "category", "value", "condition", 
+  "AOI", "sentence_phase", "dprime_battery_up_dur", 
+  "dprime_battery_up_formants", "dprime_battery_up_ptich", 
+  "dprime_battery_up_risetime", "mean_working_memory", 
+  "lextale_score", "melody_score", 
+  "beat_score", "drift_rate", "duration", 
+  "pitch_range", "stress_score", 
+  "amplitude_raw")%>%
+  mutate(participant.private.id=as.factor(participant.private.id))%>%na.omit()
+
+target_id <- id_stats %>% filter(AOI == "target_looks")%>%na.omit()
+target_id_0<-target_id%>%filter(sentence_phase==0)
+target_id_1<-target_id%>%filter(sentence_phase==1)
+
+competitor_id<- id_stats %>%
+  filter((condition == "verb_stressed" & AOI == "verb_comp_looks") |
+         (condition == "object_stressed" & AOI == "obj_comp_looks"))
+competitor_id_0<-competitor_id %>%filter(sentence_phase==0)
+competitor_id_1<-competitor_id %>%filter(sentence_phase==1)
+
+```
+
+
+#gam example for id differences
+```{r}
+library(mgcv)
+library(glmnet)
+
+# Function to automate LASSO-based GAM selection
+run_lasso_gam <- function(data, response, time_var, random_effect, alpha = 1) {
+  
+  # Step 1: Prepare data for LASSO
+  fixed_effects <- c(
+    "experiment_group", "condition", 
+    "dprime_battery_up_dur", "duration", 
+    "dprime_battery_up_formants", "stress_score", 
+    "dprime_battery_up_ptich", "pitch_range", 
+    "dprime_battery_up_risetime", "amplitude_raw", 
+    "pitch_range", "melody_score", 
+    "duration", "beat_score", 
+    "mean_working_memory", "drift_rate", "lextale_score"
+  )
+  
+  # Ensure categorical variables are properly handled
+  for (var in fixed_effects) {
+    if (is.factor(data[[var]])) {
+      data[[var]] <- as.numeric(as.factor(data[[var]]))  # Convert to numeric levels
+    }
+  }
+  
+  # Create interaction terms manually for LASSO
+  interaction_terms <- c(
+    "experiment_group * condition", 
+    "dprime_battery_up_dur * duration", 
+    "dprime_battery_up_formants * stress_score", 
+    "dprime_battery_up_ptich * pitch_range", 
+    "dprime_battery_up_risetime * amplitude_raw", 
+    "pitch_range * melody_score", 
+    "duration * beat_score", 
+    "mean_working_memory * drift_rate * lextale_score"
+  )
+  
+  # Create model matrix for LASSO
+  lasso_data <- model.matrix(as.formula(paste(response, "~", paste(fixed_effects, collapse = " + "), " + ", 
+                                              paste(interaction_terms, collapse = " + "))), 
+                             data = data)
+  
+  # Convert response to numeric (for binomial LASSO)
+  y <- as.numeric(data[[response]])
+  
+  # Step 2: Run LASSO
+  lasso_model <- cv.glmnet(lasso_data, y, family = "binomial", alpha = alpha)
+  
+  # Extract nonzero coefficients and clean variable names
+  selected_vars <- coef(lasso_model, s = "lambda.min")
+  selected_vars <- rownames(selected_vars)[selected_vars[, 1] != 0]
+  selected_vars <- selected_vars[!selected_vars %in% "(Intercept)"]
+  selected_vars <- gsub("[0-9]+", "", selected_vars)  # Remove factor level suffixes
+  
+  # Step 3: Construct GAM formula
+  gam_formula <- paste(response, "~ s(", time_var, ", k = 5) + ", 
+                        paste(selected_vars, collapse = " + "), " + ", 
+                        paste0("s(", random_effect, ", bs = 're')"))
+  
+  # Step 4: Fit the GAM
+  gam_model <- bam(as.formula(gam_formula), family = binomial(link = "logit"),
+                   data = data, method = "fREML")
+  
+  return(gam_model)
+}
+
+# Example usage:
+out0<-run_lasso_gam(target_id_0, response = "value", time_var = "time_cats", random_effect = "participant.private.id")
+
+out1<-run_lasso_gam(target_id_1, response = "value", time_var = "time_cats", random_effect = "participant.private.id")
+ 
+comp_out0<-run_lasso_gam(competitor_id_0, response = "value", time_var = "time_cats", random_effect = "participant.private.id")
+
+comp_out1<-run_lasso_gam(competitor_id_1, response = "value", time_var = "time_cats", random_effect = "participant.private.id")
 
 ```
 
 ```{r}
-competitor_gam_model0 <- bam(value ~ s(time_cats,by = experiment_group) + time_cats*experiment_group * condition +
-                         s(participant.private.id, bs = "re") + 
-                         s(audio, participant.private.id, bs = "re"),
-                         family = binomial(link = "logit"),  # Logistic regression
-                         data = competitor_gam,
-                         method = "fREML")
+
+library(broom.mixed)
+# Extract parametric (fixed effect) terms
+targ_0_best_fixed_effects <- tidy(out0, parametric = TRUE) %>%
+  mutate(model = "targ_0_best")
+
+targ_1_best_fixed_effects <- tidy(out1, parametric = TRUE) %>%
+  mutate(model = "targ_1_best")
+
+comp_0_best_fixed_effects <- tidy(comp_out0, parametric = TRUE) %>%
+  mutate(model = "comp_0_best")
+
+comp_1_best_fixed_effects <- tidy(comp_out1, parametric = TRUE) %>%
+  mutate(model = "comp_1_best")
 
 
-# Summary of model
-summary(competitor_gam_model)
+unique(id_gam$term)
+id_gam <- bind_rows(comp_0_best_fixed_effects,comp_1_best_fixed_effects,
+                    targ_0_best_fixed_effects,targ_1_best_fixed_effects)%>%
+  mutate(
+    Looks = str_extract(model, "^[^_]+"),  # Extracts the first part before "_"
+    Phrase = str_extract(model, "(?<=_)[^_]+")  # Extracts after "_"
+  )%>%
+  mutate(
+    color = case_when(
+      p.value >= 0.05 ~ "white",  # Not significant
+      str_detect(term, "dprime_battery_up_dur") ~ "#E63946",
+      str_detect(term, "dprime_battery_up_formants") ~ "#2A9D8F",
+      str_detect(term, "dprime_battery_up_ptich") ~ "#F4A261",
+      str_detect(term, "dprime_battery_up_risetime") ~ "#264653",
+      str_detect(term, "lextale_score") ~ "#bc5090",
+      str_detect(term, "mean_working_memory") ~ "grey",
+      str_detect(term, "drift_rate") ~ "#ffa600",
+      str_detect(term, "melody_score") ~ "#003f5c",
+      str_detect(term, "beat_score") ~ "#ff6361",
+      TRUE ~ "grey"
+    )
+  ) %>%
+    mutate(
+    term = case_when(
+      term == "(Intercept)" ~ "(Intercept)",
+      term == "experiment_group" ~ "L1",
+      term == "condition" ~ "Stress",
+      term == "dprime_battery_up_dur" ~ "Duration d'",
+      term == "duration" ~ "Duration",
+      term == "dprime_battery_up_formants" ~ "Formants d'",
+      term == "stress_score" ~ "Word Stress",
+      term == "dprime_battery_up_ptich" ~ "Pitch d'",
+      term == "melody_score" ~ "Melody",
+      term == "beat_score" ~ "Rhythm",
+      term == "mean_working_memory" ~ "Working Mem",
+      term == "drift_rate" ~ "Drift Rate",
+      term == "lextale_score" ~ "LexTALE",
+      term == "experiment_group:condition" ~ "L1:Stress",
+      term == "condition:experiment_group" ~ "L1:Stress",
+      term == "dprime_battery_up_dur:duration" ~ "Duration d':Duration",
+      term == "dprime_battery_up_formants:stress_score" ~ "Formants d':Word Stress",
+      term == "dprime_battery_up_ptich:pitch_range" ~ "Pitch d':Pitch Range",
+      term == "dprime_battery_up_risetime:amplitude_raw" ~ "Rise Time d':Amplitude",
+      term == "melody_score:pitch_range" ~ "Melody:Pitch Range",
+      term == "duration:beat_score" ~ "Duration:Rhythm",
+      term == "mean_working_memory:drift_rate" ~ "Working Mem:Drift Rate",
+      term == "mean_working_memory:lextale_score" ~ "Working Mem:LexTALE",
+      term == "drift_rate:lextale_score" ~ "Drift Rate:LexTALE",
+      term == "mean_working_memory:drift_rate:lextale_score" ~ "Working Mem:Drift Rate:LexTALE",
+      term == "pitch_range" ~ "Pitch Range",
+      term == "dprime_battery_up_risetime" ~ "Rise Time d'",
+      term == "pitch_range:melody_score" ~ "Pitch Range:Melody",
+      term == "amplitude_raw" ~ "Amplitude",
+      term == "pitch_range:dprime_battery_up_ptich" ~ "Pitch Range:Pitch d'",
+      term == "beat_score:duration" ~ "Rhythm:Duration",
+      TRUE ~ term
+    )
+)%>%
+  mutate(
+    Looks = factor(Looks, levels = c("targ", "comp"), 
+                   labels = c("Target looks", "Competitor looks")),
+    Phrase = factor(Phrase, levels = c("0", "1"), 
+                    labels = c("The Rabbit is Verb1 the Object1", "Not Verb2 the Object2"))
+  ) %>%
+  mutate(
+    sig_label = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE ~ ""
+    )
+  )
+
+# Create plot
+id_gam_mod_out<-ggplot(id_gam, aes(x = term, y = estimate, color = color)) +
+  geom_errorbar(aes(ymin = estimate - 1.96 *std.error, ymax = estimate + 1.96 *std.error), width = 0.4,color="black") +
+    geom_text(aes(label = sig_label,color=color), vjust = -0.5, size = 5, ) +  # Add significance stars
+
+  geom_point(size = 4,color="black") +
+  geom_point(size = 3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.6) +
+  labs(title = "",
+       x = "Model Terms", 
+       y = "Estimate") +
+  scale_color_identity() +  # Use predefined colors
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(size = 14, face = "bold")
+  ) +
+  facet_grid(Looks ~ Phrase,scales="free_x")
+
+id_gam_mod_out
+ggsave("viz/id_gam_mod_out.png", id_gam_mod_out, width = 12, height = 6, dpi = 300)
+```
+
+#individual differences
+
+```{r}
+
+scale_column <- function(x) {
+  mean_x <- mean(x, na.rm = TRUE)
+  max_abs_x <- max(abs(x - mean_x), na.rm = TRUE)  # Use max absolute deviation for scaling
+  if (max_abs_x == 0) {
+    return(rep(0, length(x)))  # Avoid division by zero if all values are identical
+  }
+  return((x - mean_x) / max_abs_x)
+}
+
+# Apply scaling to individual difference measures
+scaled_ind_diff <- ind_diff_simp %>%
+  select("participant.private.id", 
+         "dprime_battery_up_dur", "dprime_battery_up_formants",
+         "dprime_battery_up_ptich", "dprime_battery_up_risetime", 
+         "mean_working_memory", "lextale_score", "melody_score", 
+         "beat_score", "drift_rate") %>%
+  mutate(across(c("dprime_battery_up_dur", "dprime_battery_up_formants",
+                  "dprime_battery_up_ptich", "dprime_battery_up_risetime", 
+                  "mean_working_memory", "lextale_score", "melody_score", 
+                  "beat_score", "drift_rate"), scale_column))
 
 
-competitor_gam_model1 <- bam(value ~ s(time_cats,by = experiment_group) + time_cats*experiment_group * condition +
-                         s(participant.private.id, bs = "re"),
-                         family = binomial(link = "logit"),  # Logistic regression
-                         data = competitor_gam,
-                         method = "fREML")
+acc<-read.csv("../data/scaled_acoustics.csv")
+acc_cl<-acc%>%
+  mutate(
+    audio = as.factor(str_extract(word, "^[^_]+") %>% paste0(".wav")), 
+    time_cats = as.numeric(str_extract(word, "[^_]+$")))
+  
+id_stats<-gam_stats%>%
+  left_join(scaled_ind_diff)%>%
+  left_join(acc_cl)%>%
+  select("participant.private.id", 
+  "time_cats", "time_cats_words", 
+  "experiment_group", "audio", 
+  "category", "value", "condition", 
+  "AOI", "sentence_phase", "dprime_battery_up_dur", 
+  "dprime_battery_up_formants", "dprime_battery_up_ptich", 
+  "dprime_battery_up_risetime", "mean_working_memory", 
+  "lextale_score", "melody_score", 
+  "beat_score", "drift_rate", "duration", 
+  "pitch_range", "stress_score", 
+  "amplitude_raw")%>%
+  mutate(participant.private.id=as.factor(participant.private.id))
 
+target_id <- id_stats %>% filter(AOI == "target_looks")%>%na.omit()
+target_id_0<-target_id%>%filter(sentence_phase==0)
+target_id_1<-target_id%>%filter(sentence_phase==1)
 
-# Summary of model
-summary(competitor_gam_model1)
-
-competitor_gam_model2 <- bam(value ~ s(time_cats,by = experiment_group) + experiment_group + condition +
-                         s(participant.private.id, bs = "re"),
-                         family = binomial(link = "logit"),  # Logistic regression
-                         data = competitor_gam,
-                         method = "fREML")
-
-
-# Summary of model
-summary(competitor_gam_model2)
-
-
+competitor_id<- id_stats %>%
+  filter((condition == "verb_stressed" & AOI == "verb_comp_looks") |
+         (condition == "object_stressed" & AOI == "obj_comp_looks"))
+competitor_id_0<-competitor_id %>%filter(sentence_phase==0)
+competitor_id_1<-competitor_id %>%filter(sentence_phase==1)
 
 
 ```
+
+```{r}
+run_lasso_gam <- function(data, response, time_var, random_effect, alpha = 1) {
+  
+  # Step 1: Prepare data for LASSO
+  fixed_effects <- setdiff(names(data), c(response, time_var, random_effect))
+  
+  # Create interaction terms manually for LASSO
+  interaction_terms <- combn(fixed_effects, 2, function(x) paste(x, collapse = "*"))
+  lasso_data <- model.matrix(as.formula(paste(response, "~", 
+                                      paste(fixed_effects, collapse = " + "), " + ", 
+                                      paste(interaction_terms, collapse = " + "))),
+                             data = data)
+  
+  # Convert response to numeric (for binomial LASSO)
+  y <- as.numeric(data[[response]])
+  
+  # Step 2: Run LASSO
+  lasso_model <- cv.glmnet(lasso_data, y, family = "binomial", alpha = alpha)
+  
+  # Extract nonzero coefficients
+  selected_vars <- coef(lasso_model, s = "lambda.min")
+  selected_vars <- rownames(selected_vars)[selected_vars[, 1] != 0]
+  selected_vars <- selected_vars[!selected_vars %in% "(Intercept)"]
+  
+  # Step 3: Construct GAM formula
+  gam_formula <- paste(response, "~ s(", time_var, ", k = 5) + ", 
+                        paste(selected_vars, collapse = " + "), " + ", 
+                        paste0("s(", random_effect, ", bs = 're')"))
+  
+  # Step 4: Fit the GAM
+  gam_model <- bam(as.formula(gam_formula), family = binomial(link = "logit"),
+                   data = data, method = "fREML")
+  
+  return(summary(gam_model))
+}
+
+```
+
+```{r}
+run_lasso_gam(target_id_0, response = "value", time_var = "time_cats", random_effect = "participant.private.id")
+```
+
+
 
 ```{r}
 fixation_proportions_ind <- ge_data_mapped_clean %>%

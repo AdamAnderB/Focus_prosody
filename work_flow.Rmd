@@ -26,6 +26,7 @@ conflicts_prefer(dplyr::select)
 conflicts_prefer(dplyr::filter)
 ```
 
+data_pull
 ```{r}
 #English pull
 base_path<-"/Users/adambramlett/scripts/music_project_23"
@@ -51,14 +52,12 @@ mapping_audio<-read.csv("../../FoCr/experiment/mapping_audio.csv")
 time_course<-read.csv("../data/time_course.csv")
 ```
 
+#functions for keeping up with cb and participant removal
 ```{r}
 check_kept_participants <- function(existing_df = NULL, main_df = NULL, ...) {
-  # Ensure main_df or existing_df is provided
   if (is.null(existing_df) && is.null(main_df)) {
     stop("Either 'existing_df' or 'main_df' must be provided.")
   }
-  
-  # If no existing_df is given, initialize with participant IDs from main_df
   if (is.null(existing_df)) {
     if (!"participant.private.id" %in% names(main_df)) {
       stop("'participant.private.id' column is missing from main_df")
@@ -70,12 +69,11 @@ check_kept_participants <- function(existing_df = NULL, main_df = NULL, ...) {
   }
   
   datasets <- list(...)
-  dataset_names <- as.character(substitute(list(...)))[-1]  # Capture names correctly
+  dataset_names <- as.character(substitute(list(...)))[-1]
   
   for (i in seq_along(datasets)) {
     df <- datasets[[i]]
-    
-    # Ensure dataset has the necessary column
+
     if (!"participant.private.id" %in% names(df)) {
       warning(paste("Skipping dataset:", dataset_names[i], " - Missing 'participant.private.id' column."))
       next
@@ -88,19 +86,16 @@ check_kept_participants <- function(existing_df = NULL, main_df = NULL, ...) {
   return(existing_df)
 }
 
-#for tracking chronbachs alpha
 track_cronbach_alpha <- function(existing_df = NULL, ...) {
   datasets <- list(...)
-  dataset_names <- sapply(substitute(list(...))[-1], deparse)  # Capture variable names
+  dataset_names <- sapply(substitute(list(...))[-1], deparse)
   
-  # Create a dataframe with the task names and Cronbach's alpha values
   new_data <- data.frame(
     Task = dataset_names,
-    Cronbachs_Alpha = unlist(datasets),  # Extract alpha values
+    Cronbachs_Alpha = unlist(datasets),
     stringsAsFactors = FALSE
   )
   
-  # Append to existing dataframe
   if (is.null(existing_df)) {
     return(new_data)
   } else {
@@ -109,8 +104,9 @@ track_cronbach_alpha <- function(existing_df = NULL, ...) {
 }
 ```
 
-```{r}
 
+language questionnairre
+```{r}
 language_questionnaire<-data_list$Language_experience_questionnaire
 lang_quest<-language_questionnaire
 
@@ -251,6 +247,7 @@ battery_agg_agg%>%ggplot(aes(x=participant.private.id,y=mean))+
   facet_wrap(task.name~experiment)
 ```
 
+battery acoustics 
 ```{r}
 
 battery_cleaned_part_agg<-battery_cleaned%>%
@@ -308,8 +305,6 @@ battery_agg2%>%ggplot(aes(x=task.name,y=score,color=factor(task.name)))+
   geom_jitter()+
   theme_minimal()
 
-
-#here
 battery_agg<-battery_cleaned%>%
   filter(!is.na(response))%>%
   mutate(
@@ -358,6 +353,7 @@ ggpairs(battery_agg_wider_simp%>%select(!participant.private.id))
 battery_agg_wider_simp<-battery_agg_wider_simp%>%filter(participant.private.id%in%battery_cleaned_part_agg_filtered$participant.private.id)
 ```
 
+battery cb
 ```{r}
 #cronbachs:
 battery_cb <- battery_cleaned %>%
@@ -401,6 +397,7 @@ battery_cb_dur_a
 battery_cb_risetime_a
 ```
 
+digit span
 ```{r}
 digit_span<-data_list$Digit_Span__Advanced
 
@@ -456,6 +453,7 @@ digit_cb_a<-cronbach.alpha(digit_cb)$alpha
 digit_cb_a
 ```
 
+lextale
 ```{r}
 lextale<-data_list$English_LexTALE
 colnames(lextale)
@@ -526,7 +524,7 @@ lextale_agg_cleaned%>%
   geom_histogram()
 ```
 
-
+Rhythm and melody keys
 ```{r}
 
 rhythm_file<-file.path(base_path,"experimental/build_on_gorilla/rhythm_memory/rhythm_memory.html")
@@ -583,7 +581,7 @@ rhythm_key<-rhythm_key%>%
 
 ```
 
-
+Melody
 ```{r}
 melody_data<-data_list$Melody_memory
 #cleaning melody data
@@ -707,7 +705,7 @@ melody_cronbach_alpha<-cronbach_alpha$alpha
 print(melody_cronbach_alpha)
 ```
 
-
+melody viz
 ```{r}
 #melody visualization
 data_melody_full<-data_melody_full%>%
@@ -767,6 +765,7 @@ melody_agg_simp<-melody_agg%>%
     rename(participant.private.id = Participant.Private.ID)
 ```
 
+rhythm
 ```{r}
 rhythm_data<-data_list$Rhythm_memory
 ##cleaning rhythm data
@@ -898,6 +897,7 @@ rhythm_cronbach_alpha<-cronbach_alpha$alpha
 print(rhythm_cronbach_alpha)
 ```
 
+
 ```{r}
 #screen2 offset timing
 data_rhythm_complete<-data_rhythm_complete%>%
@@ -958,6 +958,7 @@ p1<-data_rhythm_complete%>%filter(beats!=0&rt_adjusted>200)%>%
 p1
 ```
 
+rhythm visualization
 ```{r}
 title<-"Correct and Incorrect distrubutions by beat across trial"
 p1<-data_rhythm_complete%>%
@@ -1001,6 +1002,7 @@ cleaned_rhythm_agg_simp<-data_rhythm_complete%>%
   rename(participant.private.id=Participant.Private.ID)
 ```
 
+flanker
 ```{r}
 flanker<-data_list$Flanker_Task%>%
   rename_with(tolower)
@@ -1048,26 +1050,23 @@ flanker_cleaned <- flanker_cleaned %>%
 
 flanker_cleaned <- flanker_cleaned %>%
   mutate(accuracy = as.numeric(accuracy),
-         reaction.time=as.numeric(reaction.time))  # Force numeric format
+         reaction.time=as.numeric(reaction.time))  
 
 
 flanker_counted <- flanker_cleaned %>%
   ungroup() %>%
   group_by(participant.private.id, trial.number) %>%
-  mutate(trial_count = row_number()) %>%  # Adds a count per (participant, trial)
+  mutate(trial_count = row_number()) %>% 
   ungroup()
 
-# Step 2: Pivot the data into wide format
 flanker_wide <- flanker_counted %>%
   select(participant.private.id, reaction.time, trial.number, trial_count) %>%
   pivot_wider(names_from = trial.number, values_from = reaction.time, values_fill = list(reaction.time = 0)) %>%
-  select(-participant.private.id)  # Remove ID for alpha calculation
+  select(-participant.private.id)  
 
-# Compute Cronbach’s Alpha
 cronbach_result <- cronbach.alpha(flanker_wide, na.rm = TRUE)
 flanker_alpha<-cronbach_result$alpha
 
-# Check if accuracy contains only 0s and 1s
 table(flanker_cleaned$accuracy)
 
 library(brms)
@@ -1080,10 +1079,8 @@ library(brms)
 #)
 
 save_ddm_model <- function(model, prefix = "ddm_output") {
-  # Get a list of existing files matching the pattern
   existing_files <- list.files(pattern = paste0("^", prefix, "_[0-9]+\\.rds$"))
   
-  # Extract existing numbers and find the next available
   if (length(existing_files) > 0) {
     existing_numbers <- as.numeric(gsub(paste0(prefix, "_(\\d+)\\.rds"), "\\1", existing_files))
     next_number <- max(existing_numbers, na.rm = TRUE) + 1
@@ -1091,27 +1088,21 @@ save_ddm_model <- function(model, prefix = "ddm_output") {
     next_number <- 1
   }
 
-  # Create the filename
   filename <- paste0(prefix, "_", next_number, ".rds")
 
-  # Save the model
   saveRDS(model, filename)
   message("Model saved as: ", filename)
 }
 
 load_ddm_model <- function(prefix = "ddm_output") {
-  # Find all saved model files
   existing_files <- list.files(pattern = paste0("^", prefix, "_[0-9]+\\.rds$"), full.names = TRUE)
   
-  # Check if there are any saved files
   if (length(existing_files) == 0) {
     stop("No saved models found.")
   }
 
-  # Sort files numerically to find the latest one
   latest_file <- tail(sort(existing_files), 1)
 
-  # Load the most recent model into the same variable name
   model <- readRDS(latest_file)
   
   message("Loaded model from: ", latest_file)
@@ -1150,7 +1141,7 @@ drift_comp%>%ggplot(aes(x=drift_rate,y=acc))+
 R.version.string
 ```
 
-
+participant removal
 ```{r}
 #part removal
 part_keep_rem<-check_kept_participants(existing_df = part_keep_rem,main_df = NULL, lang_back_keep)
@@ -1165,6 +1156,7 @@ part_keep_rem_agg <- part_keep_rem %>%
 part_keep_rem_agg_lang_stand<-part_keep_rem_agg%>%
   filter(mean_presence==1)
 
+
 colnames(part_keep_rem_agg_lang_stand)
 agg_removal<-part_keep_rem_agg%>%
   pivot_longer(-participant.private.id,
@@ -1176,8 +1168,11 @@ agg_removal<-part_keep_rem_agg%>%
 
 write.csv(part_keep_rem_agg_lang_stand, "part_keep.csv", row.names = FALSE)
 write.csv(agg_removal, "agg_part_keep.csv", row.names = FALSE)
+write.csv(part_keep_rem_agg, "part_keep_rem_agg.csv", row.names = FALSE)
+View(part_keep_rem_agg)
 ```
 
+cronbachs
 ```{r}
 #chronbachs alpha
 cronbachs_alpha<-NULL
@@ -1193,6 +1188,8 @@ cronbachs_alpha<-track_cronbach_alpha(existing_df = cronbachs_alpha,flanker_alph
 write.csv(cronbachs_alpha, "cronbachs_alpha.csv", row.names = FALSE)
 ```
 
+
+individual differences cleanup together
 ```{r}
 ind_diff<-lang_back_simple%>%
   left_join(battery_agg_wider_simp)%>%
@@ -1202,6 +1199,7 @@ ind_diff<-lang_back_simple%>%
   left_join(cleaned_rhythm_agg_simp)%>%
   left_join(flanker_simp)%>%
   filter(participant.private.id %in% part_keep_rem_agg_lang_stand$participant.private.id)
+
 
 ind_diff_simp<-ind_diff%>%
   select("participant.private.id", "age", "education",
@@ -1235,9 +1233,9 @@ ind_diff_acoust_longer <- ind_diff_scaled %>%
 
 ```
 
-
-
+indiviudal differences visualizations
 ```{r,warning=FALSE}
+
 ind_diff_raw_longer<-ind_diff_simp%>%
   pivot_longer(cols = c("mean_working_memory", "lextale_score", "drift_rate",starts_with("dprime"), "melody_score", "beat_score"),
                names_to = "cog_measures",
@@ -1406,7 +1404,7 @@ ggplot(ind_diff_raw_longer2 %>% filter(cog_measures == unique(ind_diff_raw_longe
 
 
 plots <- lapply(unique(ind_diff_raw_longer2$cog_measures), function(measure) {
-  print(paste("Processing measure:", measure))  # Debugging step
+  print(paste("Processing measure:", measure))
 
   ggplot(ind_diff_raw_longer2 %>% filter(cog_measures == measure), 
          aes(x = 0, y = scores)) +
@@ -1509,12 +1507,10 @@ p1<-ggplot(ind_diff_acoust_longer3, aes(
     fill="white",
     show.legend = FALSE)+
   geom_hline(yintercept = 0, color = "black", linewidth = .2)+
-  #coord_polar()+
   theme(axis.text.x = element_blank(),
         axis.text.y = element_blank())+
   guides(
        color = "none")+
-  # Bottom set
   geom_rect(aes(xmin = num_new_rows/2*7-5, 
                 xmax = num_new_rows/2*6+9, 
                 ymin = 16.5, ymax = 19.5),
@@ -1539,8 +1535,6 @@ p1<-ggplot(ind_diff_acoust_longer3, aes(
                 label = "Rhythm"), 
             color = "black",
             angle = 22.5) +
-
-  # Middle set
   geom_rect(aes(xmin = num_new_rows/2*7-5, 
                 xmax = num_new_rows/2*6+9, 
                 ymin = 26.25, 
@@ -1580,8 +1574,6 @@ p1<-ggplot(ind_diff_acoust_longer3, aes(
                 label = "Drift rate"), 
             color = "white",
             angle = 45) +
-
-  # Top set
   geom_rect(aes(xmin = num_new_rows/2*7-5, 
                 xmax = num_new_rows/2*6+9, 
                 ymin = 37, ymax = 40),
@@ -1659,6 +1651,39 @@ p1<-ggplot(ind_diff_acoust_longer3, aes(
   coord_polar()
 
 p1
+```
+
+
+```{r}
+part_rawers<-lang_back_simple%>%
+  group_by(participant.private.id,exp)%>%
+  unique()%>%
+  ungroup()%>%
+  group_by(exp)%>%
+  count()
+part_rawers
+
+#Raw
+#dutch	31			
+#english	74	
+
+#after removal
+#dutch	27			
+#english	61
+
+part_keepers<-ind_diff_acoust_longer3%>%
+  ungroup()%>%
+  select(participant.private.id,exp)%>%
+  group_by(participant.private.id,exp)%>%
+  unique()%>%
+  ungroup()%>%
+  group_by(exp)%>%
+  count()
+
+
+
+part_keepers
+
 ```
 
 ```{r}
@@ -1763,6 +1788,8 @@ ge_list_1_et_data<-et_data_list$Ge_et_al_task_ET_list_1
 ge_list_2_et_data<-et_data_list$Ge_et_al_task_ET_list_2
 ```
 
+
+beahvioral data and ge et al.(2021)
 ```{r}
 ge_list_data_c<-ge_list_data%>%
   rename_with(tolower)%>%
@@ -1940,7 +1967,6 @@ fixation_proportions <- ge_data_mapped_clean %>%
     se_verb_comp_looks = sd(verb_comp_looks) / sqrt(n()),
     se_dist_looks = sd(dist_looks) / sqrt(n())
   ) %>%
-  # Pivot both mean and SE together in one step
   pivot_longer(
     cols = c(starts_with("mean_"), starts_with("se_")),
     names_to = c("type", "category"),
@@ -1953,10 +1979,8 @@ fixation_proportions <- ge_data_mapped_clean %>%
 
 
 ```
-
+preliminary visuals
 ```{r}
-
-#prolific
 fixation_proportions %>%
   filter(experiment_group=="Dutch")%>%
   ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,experiment_group))) +
@@ -1982,7 +2006,6 @@ fixation_proportions %>%
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
-# You can now use `se_fixation_proportion` in your plot:
 fixation_proportions %>%
   filter(experiment_group!="Dutch")%>%
   ggplot(aes(x = time_cats_words, y = fixation_proportion, color = condition, group = interaction(condition,experiment_group))) +
@@ -2090,7 +2113,7 @@ english_fix<-all_fixations %>%
     legend.title = element_blank()
   ) +
   labs(y = "Fixation Proportion",
-       x = "") +  # Corrected way to rename the y-axis
+       x = "") +  
   scale_color_manual(values = c("#0D47A1", "#FF6F00"),
                      labels = c("Object Stressed", "Verb Stressed"))+
   guides(color = guide_legend(title = "Condition:"),
@@ -2130,7 +2153,6 @@ dutch_fix2<-all_fixations %>%
                                 "verb" = "Verb Stressed Competitor"))
 
 
-#inperson
 english_fix2<-all_fixations %>%
   filter(experiment_group != "Dutch") %>%
   ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category, whos))) +
@@ -2224,6 +2246,7 @@ levels(fixation_stats_list$time_Dutch_word_gap$condition)
 unique(fixation_stats_list$time_Dutch_word_gap$condition)
 ```
 
+fidelity stats
 ```{r}
 library(lme4)
 library(lmerTest)
@@ -2232,13 +2255,11 @@ library(broom.mixed)
 library(pbapply)
 library(tidyr)
 
-# Function to extract summary details from a model
 extract_model_summary <- function(model) {
   if (is.null(model)) return(list(fixed_effects = NULL, random_effects = NULL, model_info = NULL))
 
   model_type <- ifelse(inherits(model, "lmerMod"), "lmer", "lm")
 
-  # Extract fixed effects
   fixed_effects <- tryCatch(tidy(model, effects = "fixed"), error = function(e) NULL)
 
   # Extract random effects (only for lmer models)
@@ -2248,7 +2269,6 @@ extract_model_summary <- function(model) {
     NULL
   }
 
-  # Extract AIC, BIC, log-likelihood
   model_info <- tryCatch(
     glance(model) %>% select(AIC, BIC, logLik) %>% mutate(model_type = model_type),
     error = function(e) NULL
@@ -2261,7 +2281,7 @@ extract_model_summary <- function(model) {
   ))
 }
 
-# Function to select the best model
+# best model
 select_lmer_model <- function(df, dataset_name) {
   if (n_distinct(df$participant.private.id) < 2) {
     return(tibble(
@@ -2324,7 +2344,7 @@ select_lmer_model <- function(df, dataset_name) {
   return(bind_rows(model_results))
 }
 
-# Function to apply model selection to all datasets
+# model selection runner
 run_lmer_selection <- function(fixation_stats_list) {
   results <- pblapply(names(fixation_stats_list), function(name) {
     select_lmer_model(fixation_stats_list[[name]], dataset_name = name)
@@ -2333,41 +2353,37 @@ run_lmer_selection <- function(fixation_stats_list) {
   return(bind_rows(results))
 }
 
-# Run model selection
+# model selection
 fixation_model_results <- run_lmer_selection(fixation_stats_list)
 
-# Select the best model for each dataset
 best_models <- fixation_model_results %>%
   filter(converged == TRUE) %>%
   group_by(dataset_name) %>%
   slice_min(AIC, with_ties = FALSE) %>%
   ungroup()
 
-# Flatten the model summary columns
 library(purrr)
 
-# Unnest fixed effects first (since it always has 4 rows)
 best_model_flat <- best_models %>%
   select(dataset_name, formula, model_type, fixed_effects) %>%
   unnest(cols = fixed_effects, keep_empty = TRUE)
 
 best_models_flat <- best_model_flat %>%
   mutate(
-    experiment_group = str_extract(dataset_name, "(?<=_)[^_]+"),  # Extract between first and second _
-    time_cats_words = str_extract(dataset_name, "[^_]+$")         # Extract after last _
+    experiment_group = str_extract(dataset_name, "(?<=_)[^_]+"),
+    time_cats_words = str_extract(dataset_name, "[^_]+$") 
   )
 
-# Convert time_cats_words into a factor with the specified levels
 best_models_flat$time_cats_words <- factor(best_models_flat$time_cats_words, 
   levels = c("The rabbit is", "only", "verb1", "the1", 
              "object1", "gap", "not", "verb2", "the2", "object2", "offset")
 )
 
-
-
 best_models_flat_cleaned<-best_models_flat%>%
   select("time_cats_words","experiment_group","formula","model_type","term", "estimate","std.error","statistic","p.value")
 best_models_flat_cleaned$whos<-"Ours"
+
+View(best_models_flat_cleaned)
 
 ge_stats_summary<-read.csv("~/scripts/music_project_23/FoCr/data/ge_stats_summary3.csv")
 
@@ -2388,11 +2404,9 @@ ge_stats_summary_cleaned$whos<-"Ge et al. (2021)"
 
 all_cols <- union(colnames(best_models_flat_cleaned), colnames(ge_stats_summary_cleaned))
 
-# Add missing columns with NA in both data frames
 best_models_flat_cleaned[setdiff(all_cols, colnames(best_models_flat_cleaned))] <- NA
 ge_stats_summary_cleaned[setdiff(all_cols, colnames(ge_stats_summary_cleaned))] <- NA
 
-# Reorder columns to match
 best_models_flat_cleaned <- best_models_flat_cleaned[, all_cols]
 ge_stats_summary_cleaned <- ge_stats_summary_cleaned[, all_cols]
 ```
@@ -2422,29 +2436,21 @@ all_model_Data_viz <- rbind(best_models_flat_cleaned, ge_stats_summary_cleaned) 
     term =="(Intercept)"~"grey",
     TRUE ~ "black"                                    # All others: Black
   ))
+write.csv(all_model_Data_viz, file = "../data/all_model_Data_viz.csv", row.names = FALSE)
 ```
 
 ```{r}
-# Plot
-# Updated Dutch plot
+
 model_plot_dutch <- all_model_Data_viz %>%
   filter(experiment_group == "Dutch") %>%
-  ggplot(aes(x = term, y = estimate, color = color, fill = whos)) +  # Use custom color column
-  
-  # Add points with error bars
+  ggplot(aes(x = term, y = estimate, color = color, fill = whos)) +
   geom_point(size = 3, alpha = 0.7) +
   geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error), width = 0.2, alpha = 0.7) +
-  
-  # Add significance labels
   geom_text(aes(label = sig_level), vjust = -1, size = 4, color = "black") +
-  
-  # Titles and labels
   labs(title = "Model Output Dutch",
        x = "Predictor Terms", 
        y = "Estimate", 
        color = "Effect Type") +
-  
-  # Improve theme for readability
   theme_minimal() +
   theme(
     panel.grid.major = element_line(color = "gray90"),
@@ -2453,35 +2459,20 @@ model_plot_dutch <- all_model_Data_viz %>%
     strip.text = element_text(size = 14, face = "bold"),
     legend.position="none"
   ) +
-  
-  # Facet by time_cats_words
   facet_grid(whos ~ time_cats_words, scales = "free_x", space = "free_x") +
-  
-  # Add reference line at zero
   geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.6) +
-  
-  # Apply manual color scale
   scale_color_identity()
 
-# Updated English plot
 model_plot_english <- all_model_Data_viz %>%
   filter(experiment_group == "English") %>%
-  ggplot(aes(x = term, y = estimate, color = color, fill = whos)) +  # Use custom color column
-  
-  # Add points with error bars
+  ggplot(aes(x = term, y = estimate, color = color, fill = whos)) + 
   geom_point(size = 3, alpha = 0.7) +
   geom_errorbar(aes(ymin = estimate - 1.96 *std.error, ymax = estimate + 1.96 *std.error), width = 0.2, alpha = 0.7) +
-  
-  # Add significance labels
   geom_text(aes(label = sig_level), vjust = -1, size = 4, color = "black") +
-  
-  # Titles and labels
   labs(title = "Model Output English",
        x = "Predictor Terms", 
        y = "Estimate", 
        color = "Effect Type") +
-  
-  # Improve theme for readability
   theme_minimal() +
   theme(
     panel.grid.major = element_line(color = "gray90"),
@@ -2490,17 +2481,9 @@ model_plot_english <- all_model_Data_viz %>%
     strip.text = element_text(size = 14, face = "bold"),
     legend.position="none"
   ) +
-  
-  # Facet by time_cats_words
   facet_grid(whos ~ time_cats_words, scales = "free_x", space = "free_x") +
-  
-  # Add reference line at zero
   geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.6) +
-  
-  # Apply manual color scale
   scale_color_identity()
-
-# Display plots
 
 model_plot_english
 model_plot_dutch
@@ -2573,13 +2556,9 @@ competitor_gam_1<-competitor_gam %>%filter(sentence_phase==1)
 ```
 
 ```{r}
-#function for model selection
 choose_best_gam <- function(model1, model2, plot_smooth = TRUE) {
-  # Extract AIC and BIC for both models
   aic_values <- AIC(model1, model2)
   bic_values <- BIC(model1, model2)
-
-  # Select the best model (lower AIC is better)
   if (aic_values$AIC[1] < aic_values$AIC[2]) {
     best_model <- model1
     best_model_name <- "Model 1"
@@ -2587,12 +2566,8 @@ choose_best_gam <- function(model1, model2, plot_smooth = TRUE) {
     best_model <- model2
     best_model_name <- "Model 2"
   }
-
-  # Print AIC/BIC values for comparison
   print(aic_values)
   print(bic_values)
-
-  # Ensure the function returns the best model object
   message("Best model selected: ", best_model_name)
   return(best_model)
 }
@@ -2714,16 +2689,14 @@ competitor_gam_model1_2 <- bam(value ~ time_cats + experiment_group + condition 
 # Summary of model
 summary(competitor_gam_model1_2)
 
-
+levels(target_gam_0$experiment_group)
 comp_0_best<-choose_best_gam(competitor_gam_model0_1,competitor_gam_model0_2)
 comp_1_best<-choose_best_gam(competitor_gam_model1_1,competitor_gam_model1_2)
 ```
 
 ```{r}
 library(broom)
-library(broom.mixed)  # For handling GAMs properly
-
-# Extract parametric (fixed effect) terms
+library(broom.mixed)  
 targ_0_best_fixed_effects <- tidy(targ_0_best, parametric = TRUE) %>%
   mutate(model = "targ_0_best")
 
@@ -2743,16 +2716,16 @@ all_best_fixed_effects <- bind_rows(
   comp_1_best_fixed_effects)%>%
   
   mutate(
-    Looks = str_extract(model, "^[^_]+"),  # Extracts the first part before "_"
+    Looks = str_extract(model, "^[^_]+"), 
     Phrase = str_extract(model, "(?<=_)[^_]+"))%>%
   mutate(
     color = case_when(
-      term == "experiment_groupDutch" & estimate > 0 ~ "grey80",
-      term == "experiment_groupDutch" & estimate <= 0 ~ "black",  
+      term == "experiment_groupDutch" & estimate > 0 ~ "black",
+      term == "experiment_groupDutch" & estimate <= 0 ~ "grey80",  
       term == "conditionverb_stressed" & estimate > 0 ~ "#FF6F00", 
       term == "conditionverb_stressed" & estimate <= 0 ~ "#0D47A1", 
-      term == "time_cats:experiment_groupDutch" & estimate > 0 ~ "grey80", 
-      term == "time_cats:experiment_groupDutch" & estimate <= 0 ~ "black", 
+      term == "time_cats:experiment_groupDutch" & estimate > 0 ~ "black", 
+      term == "time_cats:experiment_groupDutch" & estimate <= 0 ~ "grey80", 
       term == "time_cats:conditionverb_stressed" & estimate > 0 ~ "#FF6F00",
       term == "time_cats:conditionverb_stressed" & estimate <= 0 ~ "#0D47A1",
       TRUE ~ "white"
@@ -2773,7 +2746,7 @@ all_best_fixed_effects <- bind_rows(
     Looks = factor(Looks, levels = c("targ", "comp"), 
                    labels = c("Target looks", "Competitor looks")),
     Phrase = factor(Phrase, levels = c("0", "1"), 
-                    labels = c("The Rabbit is Verb1 the Object1", "Not Verb2 the Object2"))
+                    labels = c("The Rabbit is only Verb1 the Object1", "Not Verb2 the Object2"))
   )%>%
   mutate(
     sig_label = case_when(
@@ -2784,11 +2757,9 @@ all_best_fixed_effects <- bind_rows(
     )
   )
 
-
-# Create plot
 gam_mod_out<-ggplot(all_best_fixed_effects, aes(x = term, y = estimate, color = color)) +
   geom_errorbar(aes(ymin = estimate - 1.96 *std.error, ymax = estimate +1.96 * std.error), width = 0.4,color="black") +
-    geom_text(aes(label = sig_label,color=color), vjust = -0.5, size = 5, ) +  # Add significance stars
+      geom_text(aes(label = sig_label),color="black", vjust = -0.8, size = 5, ) + 
 
   geom_point(size = 4,color="black") +
   geom_point(size = 3) +
@@ -2796,7 +2767,7 @@ gam_mod_out<-ggplot(all_best_fixed_effects, aes(x = term, y = estimate, color = 
   labs(title = "",
        x = "Model Terms", 
        y = "Estimate") +
-  scale_color_identity() +  # Use predefined colors
+  scale_color_identity() + 
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
@@ -2806,6 +2777,9 @@ gam_mod_out<-ggplot(all_best_fixed_effects, aes(x = term, y = estimate, color = 
 
 gam_mod_out
 ggsave("viz/gam_mod_out.png", gam_mod_out, width = 12, height = 6, dpi = 300)
+
+View(all_best_fixed_effects)
+write.csv(all_best_fixed_effects, file = "../data/gam_models.csv", row.names = FALSE)
 ```
 
 #individual differences
@@ -2815,14 +2789,13 @@ View(ind_diff_simp)
 
 scale_column <- function(x) {
   mean_x <- mean(x, na.rm = TRUE)
-  max_abs_x <- max(abs(x - mean_x), na.rm = TRUE)  # Use max absolute deviation for scaling
+  max_abs_x <- max(abs(x - mean_x), na.rm = TRUE)
   if (max_abs_x == 0) {
-    return(rep(0, length(x)))  # Avoid division by zero if all values are identical
+    return(rep(0, length(x)))
   }
   return((x - mean_x) / max_abs_x)
 }
 
-# Apply scaling to individual difference measures
 scaled_ind_diff <- ind_diff_simp %>%
   select("participant.private.id", 
          "dprime_battery_up_dur", "dprime_battery_up_formants",
@@ -2875,10 +2848,8 @@ competitor_id_1<-competitor_id %>%filter(sentence_phase==1)
 library(mgcv)
 library(glmnet)
 
-# Function to automate LASSO-based GAM selection
 run_lasso_gam <- function(data, response, time_var, random_effect, alpha = 1) {
-  
-  # Step 1: Prepare data for LASSO
+
   fixed_effects <- c(
     "experiment_group", "condition", 
     "dprime_battery_up_dur", "duration", 
@@ -2890,14 +2861,12 @@ run_lasso_gam <- function(data, response, time_var, random_effect, alpha = 1) {
     "mean_working_memory", "drift_rate", "lextale_score"
   )
   
-  # Ensure categorical variables are properly handled
+  #categorical variables handled
   for (var in fixed_effects) {
     if (is.factor(data[[var]])) {
-      data[[var]] <- as.numeric(as.factor(data[[var]]))  # Convert to numeric levels
+      data[[var]] <- as.numeric(as.factor(data[[var]])) 
     }
   }
-  
-  # Create interaction terms manually for LASSO
   interaction_terms <- c(
     "experiment_group * condition", 
     "dprime_battery_up_dur * duration", 
@@ -2909,36 +2878,29 @@ run_lasso_gam <- function(data, response, time_var, random_effect, alpha = 1) {
     "mean_working_memory * drift_rate * lextale_score"
   )
   
-  # Create model matrix for LASSO
+  # LASSO matrix
   lasso_data <- model.matrix(as.formula(paste(response, "~", paste(fixed_effects, collapse = " + "), " + ", 
                                               paste(interaction_terms, collapse = " + "))), 
                              data = data)
   
   # Convert response to numeric (for binomial LASSO)
   y <- as.numeric(data[[response]])
-  
-  # Step 2: Run LASSO
+
   lasso_model <- cv.glmnet(lasso_data, y, family = "binomial", alpha = alpha)
-  
-  # Extract nonzero coefficients and clean variable names
   selected_vars <- coef(lasso_model, s = "lambda.min")
   selected_vars <- rownames(selected_vars)[selected_vars[, 1] != 0]
   selected_vars <- selected_vars[!selected_vars %in% "(Intercept)"]
-  selected_vars <- gsub("[0-9]+", "", selected_vars)  # Remove factor level suffixes
-  
-  # Step 3: Construct GAM formula
+  selected_vars <- gsub("[0-9]+", "", selected_vars)  
   gam_formula <- paste(response, "~ s(", time_var, ", k = 5) + ", 
                         paste(selected_vars, collapse = " + "), " + ", 
                         paste0("s(", random_effect, ", bs = 're')"))
-  
-  # Step 4: Fit the GAM
+
   gam_model <- bam(as.formula(gam_formula), family = binomial(link = "logit"),
                    data = data, method = "fREML")
   
   return(gam_model)
 }
 
-# Example usage:
 out0<-run_lasso_gam(target_id_0, response = "value", time_var = "time_cats", random_effect = "participant.private.id")
 
 out1<-run_lasso_gam(target_id_1, response = "value", time_var = "time_cats", random_effect = "participant.private.id")
@@ -2952,7 +2914,6 @@ comp_out1<-run_lasso_gam(competitor_id_1, response = "value", time_var = "time_c
 ```{r}
 
 library(broom.mixed)
-# Extract parametric (fixed effect) terms
 targ_0_best_fixed_effects <- tidy(out0, parametric = TRUE) %>%
   mutate(model = "targ_0_best")
 
@@ -2970,12 +2931,12 @@ unique(id_gam$term)
 id_gam <- bind_rows(comp_0_best_fixed_effects,comp_1_best_fixed_effects,
                     targ_0_best_fixed_effects,targ_1_best_fixed_effects)%>%
   mutate(
-    Looks = str_extract(model, "^[^_]+"),  # Extracts the first part before "_"
-    Phrase = str_extract(model, "(?<=_)[^_]+")  # Extracts after "_"
+    Looks = str_extract(model, "^[^_]+"), 
+    Phrase = str_extract(model, "(?<=_)[^_]+")
   )%>%
   mutate(
     color = case_when(
-      p.value >= 0.05 ~ "white",  # Not significant
+      p.value >= 0.05 ~ "white",
       str_detect(term, "dprime_battery_up_dur") ~ "#E63946",
       str_detect(term, "dprime_battery_up_formants") ~ "#2A9D8F",
       str_detect(term, "dprime_battery_up_ptich") ~ "#F4A261",
@@ -3028,7 +2989,7 @@ id_gam <- bind_rows(comp_0_best_fixed_effects,comp_1_best_fixed_effects,
     Looks = factor(Looks, levels = c("targ", "comp"), 
                    labels = c("Target looks", "Competitor looks")),
     Phrase = factor(Phrase, levels = c("0", "1"), 
-                    labels = c("The Rabbit is Verb1 the Object1", "Not Verb2 the Object2"))
+                    labels = c("The Rabbit is only Verb1 the Object1", "Not Verb2 the Object2"))
   ) %>%
   mutate(
     sig_label = case_when(
@@ -3039,18 +3000,17 @@ id_gam <- bind_rows(comp_0_best_fixed_effects,comp_1_best_fixed_effects,
     )
   )
 
-# Create plot
 id_gam_mod_out<-ggplot(id_gam, aes(x = term, y = estimate, color = color)) +
   geom_errorbar(aes(ymin = estimate - 1.96 *std.error, ymax = estimate + 1.96 *std.error), width = 0.4,color="black") +
-    geom_text(aes(label = sig_label,color=color), vjust = -0.5, size = 5, ) +  # Add significance stars
-
+    geom_text(aes(label = sig_label),
+              color="black", vjust = -0.5, size = 5, )+  
   geom_point(size = 4,color="black") +
   geom_point(size = 3) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.6) +
   labs(title = "",
        x = "Model Terms", 
        y = "Estimate") +
-  scale_color_identity() +  # Use predefined colors
+  scale_color_identity() +
   theme_minimal() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
@@ -3060,22 +3020,24 @@ id_gam_mod_out<-ggplot(id_gam, aes(x = term, y = estimate, color = color)) +
 
 id_gam_mod_out
 ggsave("viz/id_gam_mod_out.png", id_gam_mod_out, width = 12, height = 6, dpi = 300)
+
+
+write.csv(id_gam, file = "../data/id_gam_models.csv", row.names = FALSE)
 ```
 
-#individual differences
+#individual differences (possibel cleanup required below. not deleted to ensure system is checked before deletion)
 
 ```{r}
 
 scale_column <- function(x) {
   mean_x <- mean(x, na.rm = TRUE)
-  max_abs_x <- max(abs(x - mean_x), na.rm = TRUE)  # Use max absolute deviation for scaling
+  max_abs_x <- max(abs(x - mean_x), na.rm = TRUE)  
   if (max_abs_x == 0) {
-    return(rep(0, length(x)))  # Avoid division by zero if all values are identical
+    return(rep(0, length(x)))  
   }
   return((x - mean_x) / max_abs_x)
 }
 
-# Apply scaling to individual difference measures
 scaled_ind_diff <- ind_diff_simp %>%
   select("participant.private.id", 
          "dprime_battery_up_dur", "dprime_battery_up_formants",
@@ -3126,33 +3088,26 @@ competitor_id_1<-competitor_id %>%filter(sentence_phase==1)
 ```{r}
 run_lasso_gam <- function(data, response, time_var, random_effect, alpha = 1) {
   
-  # Step 1: Prepare data for LASSO
   fixed_effects <- setdiff(names(data), c(response, time_var, random_effect))
   
-  # Create interaction terms manually for LASSO
   interaction_terms <- combn(fixed_effects, 2, function(x) paste(x, collapse = "*"))
   lasso_data <- model.matrix(as.formula(paste(response, "~", 
                                       paste(fixed_effects, collapse = " + "), " + ", 
                                       paste(interaction_terms, collapse = " + "))),
                              data = data)
   
-  # Convert response to numeric (for binomial LASSO)
   y <- as.numeric(data[[response]])
-  
-  # Step 2: Run LASSO
+
   lasso_model <- cv.glmnet(lasso_data, y, family = "binomial", alpha = alpha)
-  
-  # Extract nonzero coefficients
+
   selected_vars <- coef(lasso_model, s = "lambda.min")
   selected_vars <- rownames(selected_vars)[selected_vars[, 1] != 0]
   selected_vars <- selected_vars[!selected_vars %in% "(Intercept)"]
   
-  # Step 3: Construct GAM formula
   gam_formula <- paste(response, "~ s(", time_var, ", k = 5) + ", 
                         paste(selected_vars, collapse = " + "), " + ", 
                         paste0("s(", random_effect, ", bs = 're')"))
   
-  # Step 4: Fit the GAM
   gam_model <- bam(as.formula(gam_formula), family = binomial(link = "logit"),
                    data = data, method = "fREML")
   
@@ -3181,7 +3136,6 @@ fixation_proportions_ind <- ge_data_mapped_clean %>%
     se_verb_comp_looks = sd(verb_comp_looks) / sqrt(n()),
     se_dist_looks = sd(dist_looks) / sqrt(n())
   ) %>%
-  # Pivot both mean and SE together in one step
   pivot_longer(
     cols = c(starts_with("mean_"), starts_with("se_")),
     names_to = c("type", "category"),
@@ -3192,8 +3146,6 @@ fixation_proportions_ind <- ge_data_mapped_clean %>%
               names_from = type)%>%
   mutate(fixation_proportion=mean)
 
-
-# You can now use `se_fixation_proportion` in your plot:
 fixation_proportions_ind %>%
   ggplot(aes(x = time_cats_words, 
              y = fixation_proportion, 
@@ -3207,7 +3159,7 @@ fixation_proportions_ind %>%
   facet_wrap(category ~ .) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1),
-        legend.position = "none")  # This removes the legend completely
+        legend.position = "none") 
 
 fixation_proportions_ind %>%
   ggplot(aes(x = time_cats_words, 

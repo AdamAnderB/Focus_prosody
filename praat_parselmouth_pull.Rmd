@@ -128,7 +128,7 @@ acc_data<-acoustic_measures_df$pitch_data%>%
   mutate(word_actual = sub("_.*", "", word))%>%
   mutate(time_cats_words = case_when(
       time_cats == 0 ~ "         ",
-      time_cats == 1 ~ "The dinasaur is", 
+      time_cats == 1 ~ "The rabbit is", 
       time_cats == 2 ~ "only",
       time_cats == 3 ~ "verb1",
       time_cats == 4 ~ "the1",
@@ -143,7 +143,7 @@ acc_data<-acoustic_measures_df$pitch_data%>%
       TRUE ~ NA_character_))%>%
   mutate(time_cats_words = factor(time_cats_words, 
                                   levels = c("         ", 
-                                             "The dinasaur is", "only", 
+                                             "The rabbit is", "only", 
                                              "verb1", "the1", "object1", "gap",
                                              "not", "verb2", "the2", "object2",
                                              "offset")))%>%
@@ -215,5 +215,182 @@ acc_plot<-ggplot(acc_data, aes(x = time_modified, y = frequency, color = conditi
 acc_plot
 
 ggsave("viz/accoustic.png", acc_plot, width = 20, height = 5, dpi = 300)
+```
+
+
+```{r}
+pitch_data<-acoustic_measures_df$pitch_data%>%
+  group_by(word)%>%
+  mutate(frequency=if_else(frequency==0,70,frequency))%>%
+  summarize(min_pitch=min(frequency),
+            max_pitch=max(frequency))%>%
+  mutate(pitch_range=max_pitch-min_pitch)%>%
+  select(word,pitch_range)%>%
+  group_by(word) %>%
+  mutate(pitch_range = ifelse(is.na(pitch_range), 
+                              (lag(pitch_range) + lead(pitch_range)) / 2, 
+                              pitch_range))
+
+
+
+promenance<-acoustic_measures_df$spectral_tilt%>%
+  mutate(
+    stress_score = (`0-500 Hz` + `500-1000 Hz`) / 2,  # Simple stress measure
+    amplitude_raw = `0-500 Hz` + `500-1000 Hz` + `1000-2000 Hz` + `2000-4000 Hz`,  # Raw total energy
+    amplitude_db = ifelse(amplitude_raw > 0, 10 * log10(amplitude_raw), NA)  # Convert to dB scale
+  ) %>%
+  select(word, stress_score, amplitude_raw)
+
+all_acoustics<-acoustic_measures_df$static_measures%>%
+  select(word,duration)%>%
+  left_join(pitch_data)%>%
+  left_join(promenance)
+
+colnames(all_acoustics)
+
+scale_column <- function(x) {
+  mean_x <- mean(x, na.rm = TRUE)
+  max_abs_x <- max(abs(x - mean_x), na.rm = TRUE)  # Ensure max absolute value is used
+  if (max_abs_x == 0) {
+    return(rep(0, length(x)))  # If all values are the same, return zeroed vector
+  }
+  return((x - mean_x) / max_abs_x)
+}
+
+# Apply scaling to each numeric column except 'word'
+scaled_acoustics <- all_acoustics %>%
+  mutate(across(c(duration, pitch_range, stress_score, amplitude_raw), scale_column))
+
+# View the resulting scaled dataframe
+file_path <- "../data/scaled_acoustics.csv"
+
+# Save as CSV
+write.csv(scaled_acoustics, file = file_path, row.names = FALSE)
+
+
+```
+
+
+```{r}
+acoustic_data <- scaled_acoustics %>%
+  left_join(acc_data %>% select(word, time_cats_words), by = "word") %>%
+  pivot_longer(cols = c(duration, pitch_range, stress_score, amplitude_raw),
+               names_to = "Acoustic_Measure",
+               values_to = "Scaled_Value")
+
+# Ensure correct condition mapping
+acoustic_data <- scaled_acoustics %>%
+  left_join(acc_data %>% select(word, time_cats), by = "word") %>%
+  
+  # Assigning conditions (Verb/Object Focused)
+  mutate(condition = case_when(
+    substr(word, 1, 1) == "b" ~ "Verb Focused",
+    substr(word, 1, 1) == "a" ~ "Object Focused",
+    TRUE ~ NA_character_
+  )) %>%
+  
+  # Restore `time_cats_words` mapping
+  mutate(time_cats_words = case_when(
+    time_cats == 0  ~ "Before",
+    time_cats == 1  ~ "The rabbit is", 
+    time_cats == 2  ~ "only",
+    time_cats == 3  ~ "verb1",
+    time_cats == 4  ~ "the1",
+    time_cats == 5  ~ "object1",
+    time_cats == 6  ~ "gap",
+    time_cats == 7  ~ "not",
+    time_cats == 8  ~ "verb2",
+    time_cats == 9  ~ "the2",
+    time_cats == 10 ~ "object2",
+    time_cats == 11 ~ "offset",
+    time_cats == 12 ~ "offset",
+    TRUE ~ NA_character_
+  )) %>%
+  
+  # **Remove "Before" first, then reorder factor levels**
+  filter(!is.na(time_cats_words), time_cats_words != "Before") %>%
+  
+  # Ensure `time_cats_words` is a factor **after filtering**
+  mutate(time_cats_words = factor(time_cats_words, 
+                                  levels = c("The rabbit is", "only", 
+                                             "verb1", "the1", "object1", "gap",
+                                             "not", "verb2", "the2", "object2",
+                                             "offset"))) %>%
+
+  # Pivot longer for faceting
+  pivot_longer(cols = c(duration, pitch_range, stress_score, amplitude_raw),
+               names_to = "Acoustic_Measure",
+               values_to = "Scaled_Value")
+
+
+
+
+
+
+# **Split data for left/right half-violins**
+acoustic_data_verb <- acoustic_data %>% filter(condition == "Verb Focused")
+acoustic_data_object <- acoustic_data %>% filter(condition == "Object Focused")
+
+
+
+# **Generate the combined half-violin plot**
+# Create base plot
+acoustic_plot <- ggplot(acoustic_data, aes(x = Acoustic_Measure, y = Scaled_Value)) +
+  
+  # **Left Half Violins (Verb Focused - Orange)**
+  geom_half_violin(data = acoustic_data_verb, 
+                   aes(x = Acoustic_Measure,
+                       color = ifelse(time_cats_words %in% c("gap", "offset"), NA, condition),
+                       fill = ifelse(time_cats_words %in% c("gap", "offset"), NA, condition)),
+                   side = "l", position = "identity", 
+                   width = 1, na.rm = TRUE, alpha = 0.5) +
+  
+  # **Right Half Violins (Object Focused - Blue)**
+  geom_half_violin(data = acoustic_data_object, 
+                   aes(x = Acoustic_Measure,
+                       color = ifelse(time_cats_words %in% c("gap", "offset"), NA, condition),
+                       fill = ifelse(time_cats_words %in% c("gap", "offset"), NA, condition)),
+                   side = "r", position = "identity", 
+                   width = 1, na.rm = TRUE, alpha = 0.5) +
+  
+  # **Jitter points (keeping gap/offset invisible)**
+  geom_jitter(aes(color = ifelse(time_cats_words %in% c("gap", "offset"), NA, condition)),
+              alpha = 0.1, width = 0.3, height = 0.3, size = 0.1, na.rm = TRUE) +
+
+  # **Set color scale manually**
+  scale_color_manual(values = c("Verb Focused" = "#FF6F00",  # Orange
+                                "Object Focused" = "#0D47A1"),  # Blue
+                     na.translate = FALSE, guide = "none") +
+  scale_fill_manual(values = c("Verb Focused" = "#FF6F00", 
+                               "Object Focused" = "#0D47A1"), 
+                    na.translate = FALSE, guide = "none") +
+
+  # **Facet by time_cats_words while keeping empty facets**
+  facet_grid(. ~ time_cats_words, drop = FALSE, scales = "free_x", space = "free_x") +
+
+  # **Rename x-axis categories**
+  scale_x_discrete(labels = c("Duration", "Pitch Range", "Word Stress", "Amplitude")) +
+
+  # **Labels and themes**
+  labs(title = "",
+       x = "Acoustic Measure",
+       y = "Scaled Acoustic Value") +
+  
+  theme_minimal() +
+  theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 12),  # Adjust size for readability
+        strip.text = element_text(size = 14, face = "bold"), 
+        # **Remove x-axis text for "gap" and "offset"**
+        strip.text.x = element_text(size = ifelse(levels(acoustic_data$time_cats_words) %in% c("gap", "offset"), 0, 14))
+  )
+acoustic_plot
+
+# **Save plot**
+ggsave("viz/acoustic_faceted.png", acoustic_plot, width = 14, height = 6, dpi = 300)
+
+
+
+
 ```
 

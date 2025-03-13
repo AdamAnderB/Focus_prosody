@@ -5,7 +5,7 @@
 
 ## Additional Resources  
 For further details and resources related to this project, please visit the following link:  
-[Open Science Framework - Project Repository]([https://osf.io/wa4gv/?view_only=de113dbced6b46fab96ca8217b3c1ca6](https://osf.io/wa4gv/?view_only=7664751c20804602971b048cee7262e9)).
+[Open Science Framework - Project Repository](https://osf.io/wa4gv/?view_only=de113dbced6b46fab96ca8217b3c1ca6)
 
 ## Overview  
 This project introduces the **FiREE Replication Framework**, a structured approach to replication that integrates **Fidelity**, **Refinement**, and **Exploratory Extension**. The framework was developed to balance adherence to original study designs with improved statistical rigor and theoretical extensions. Our study applies FiREE to a web-based eye-tracking replication of **Ge, Mulders, Kang, Chen, & Yip (2021)**.

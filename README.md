@@ -17,11 +17,8 @@ This project introduces the **FiREE Replication Framework**, a structured approa
 - **Open-Science Tools:** Full dataset, analysis scripts, and replication materials available via OSF.  
 
 ### Fidelity
-**Replicated Fixation Proportions (English):**  
-  ![Fixation Proportions](viz/english_fix.png) **Replicated Fixation Proportions (English):**  
-<div style="background-color: white; padding: 10px; display: inline-block;">
-    <img src="viz/english_fix.png" alt="Fixation Proportions">
-</div>
+ **Replicated Fixation Proportions (English):**  
+  ![Fixation Proportions](viz/english_fix.png) 
 - **Replicated Fixation Proportions (Dutch):**  
   ![Fixation Proportions](viz/dutch_fix.png)
 - **Fidelity model output (English):**  

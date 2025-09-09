@@ -445,7 +445,6 @@ fixation_proportions%>%ggplot(aes(x=time_rounded,y=fixation_proportion,color=con
 
 
 ```{r}
-View(ge_data)
 
 ge_data_spag<-ge_data%>%
   group_by(time_rounded,quadrant, condition,filler,audio)%>%

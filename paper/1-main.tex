@@ -1,213 +1,196 @@
-%Version 3 October 2023
-% See section 11 of the User Manual for version history
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%                                                                 %%
-%% Please do not use \input{...} to include other tex files.       %%
-%% Submit your LaTeX manuscript as one .tex document.              %%
-%%                                                                 %%
-%% All additional figures and files should be attached             %%
-%% separately and not embedded in the \TeX\ document itself.       %%
-%%                                                                 %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% This template is based on the apa7 latex class.
+% I recommend reading about the class here:
+% https://ctan.math.illinois.edu/macros/latex/contrib/apa7/apa7.pdf
+% The class includes various useful commands which all format documents in the correct apa7 style.
 
-%%\documentclass[referee,sn-basic]{sn-jnl}% referee option is meant for double line spacing
-
-%%=======================================================%%
-%% to print line numbers in the margin use lineno option %%
-%%=======================================================%%
-
-%%\documentclass[lineno,sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
-
-%%======================================================%%
-%% to compile with pdflatex/xelatex use pdflatex option %%
-%%======================================================%%
-
-%%\documentclass[pdflatex,sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+% Documentlass can be stu (student), doc (document), jou (journal), or man (manuscript)
+% Use stu for Course papers
+\documentclass[man, floatsintext, letterpaper, 12pt, donotrepeattitle]{apa7}
+\usepackage[style=apa, backend=biber]{biblatex}
+\addbibresource{my_bib.bib}
+\usepackage[american]{babel}
 
 
-%%Note: the following reference styles support Namedate and Numbered referencing. By default the style follows the most common style. To switch between the options you can add or remove Numbered in the optional parenthesis. 
-%%The option is available for: sn-basic.bst, sn-vancouver.bst, sn-chicago.bst%  
- 
-%%\documentclass[sn-nature]{sn-jnl}% Style for submissions to Nature Portfolio journals
-%%\documentclass[sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
-%\documentclass[sn-mathphys-num]{sn-jnl}% Math and Physical 
-%\documentclass[sn-basic]{sn-jnl}
-%%\documentclass[sn-mathphys-ay]{sn-jnl}% Math and Physical Sciences Author Year Reference Style
-%%\documentclass[sn-aps]{sn-jnl}% American Physical Society (APS) Reference Style
-%%\documentclass[sn-vancouver,Numbered]{sn-jnl}% Vancouver Reference Style
-\documentclass[sn-apa]{sn-jnl}% APA Reference Style 
-%%\documentclass[sn-chicago]{sn-jnl}% Chicago-based Humanities Reference Style
+%\usepackage{fontspec}        % For specifying fonts
+%\setmainfont{Times New Roman} % Font for the main text
+\usepackage{newtxtext} 
 
-%%%% Standard Packages
-%%<additional latex packages if required can be included here>
-%\documentclass{article}
-\usepackage{makecell}
-\usepackage{array}
-\usepackage{graphicx}%
-\usepackage{multirow}%
-\usepackage{caption}
-\usepackage{natbib}
-\usepackage{threeparttable}
-\usepackage{amsmath,amssymb,amsfonts}%
-\usepackage{amsthm}%
-\usepackage{mathrsfs}%
-\usepackage[title]{appendix}%
-\usepackage{xcolor}
-\usepackage{soul}
-\usepackage{xcolor}%
-\usepackage{textcomp}%
-\usepackage{manyfoot}%
-\usepackage{booktabs}%
-\usepackage{algorithm}%
-\usepackage{algorithmicx}%
-\usepackage{algpseudocode}%
-\usepackage{listings}%
-\usepackage{subfiles}
-\usepackage{multirow}
-\usepackage{booktabs}
+
+%%%%% PACKAGES
+
 \usepackage{tipa}
-\usepackage{hyperref}
-\usepackage{graphicx}
+\usepackage{csquotes}
+\usepackage{subfiles}
+%this is off because I figured out a process for making it a word file but it requires that the numbers are off to do it
+%\usepackage[right]{lineno}%numbers on the right
+%\linenumbers
 \usepackage{lipsum}
-\usepackage[utf8]{inputenc}\usepackage{xcolor}
-\usepackage{xcolor, colortbl}
+\usepackage{xcolor}
+%hyperlink colors fix
+\usepackage{listings}
+\usepackage{soul}
 
-% Define your colors using hex codes
 
-%%%%
+%ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION 
+%without yellow 
 
-%%%%%=============================================================================%%%%
-%%%%  Remarks: This template is provided to aid authors with the preparation
-%%%%  of original research articles intended for submission to journals published 
-%%%%  by Springer Nature. The guidance has been prepared in partnership with 
-%%%%  production teams to conform to Springer Nature technical requirements. 
-%%%%  Editorial and presentation requirements differ among journal portfolios and 
-%%%%  research disciplines. You may find sections in this template are irrelevant 
-%%%%  to your work and are empowered to omit any such section if allowed by the 
-%%%%  journal you intend to submit to. The submission guidelines and policies 
-%%%%  of the journal take precedence. A detailed User Manual is available in the 
-%%%%  template package for technical guidance.
-%%%%%=============================================================================%%%%
+%\sethlcolor{white}
+%with yellow
+\sethlcolor{yellow}
+%ATTENTION ATTENTION ATTENTION ATTENTION ATTENTION 
 
-%% as per the requirement new theorem styles can be included as shown below
-\theoremstyle{thmstyleone}%
-\newtheorem{theorem}{Theorem}%  meant for continuous numbers
-%%\newtheorem{theorem}{Theorem}[section]% meant for sectionwise numbers
-%% optional argument [theorem] produces theorem numbering sequence instead of independent numbers for Proposition
-\newtheorem{proposition}[theorem]{Proposition}% 
-%%\newtheorem{proposition}{Proposition}% to get separate numbers for theorem and proposition etc.
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+\definecolor{orange}{RGB}{253,181,21}
+\definecolor{custombg}{RGB}{220,220,220} % Adjust the background color
+\definecolor{pink}{RGB}{255,105,180}
+\definecolor{customgreen}{RGB}{0,128,0}
+\definecolor{customorange}{RGB}{255,165,0}
+\definecolor{bluethread}{RGB}{8,146,208}
+\definecolor{codegray}{RGB}{246,246,246}
+\definecolor{cmu_red}{RGB}{196,18,48}
+\definecolor{rose_red}{RGB}{239,58,71}
+\definecolor{cmu_blue}{RGB}{4,54,115}
+\definecolor{green}{RGB}{0,150,71}
+\definecolor{cmu_grey}{RGB}{109,110,113}
+%\definecolor{gorilla_red}{RGB}{231,18,52}
+\definecolor{gorilla_red}{RGB}{254,243,245}
 
-\theoremstyle{thmstyletwo}%
-\newtheorem{example}{Example}%
-\newtheorem{remark}{Remark}%
+\definecolor{yellow}{RGB}{255,255,0}
 
-\theoremstyle{thmstylethree}%
-\newtheorem{definition}{Definition}%
 
-\raggedbottom
-%%\unnumbered% uncomment this for unnumbered level heads
+\usepackage{booktabs}
+\usepackage{amssymb}
+\hypersetup{
+    colorlinks,
+    linkcolor={blue!50!black},
+    citecolor={blue!50!black},
+    urlcolor={blue!80!black}
+}
 
+\newcommand{\inlineR}[1]{{\footnotesize\texttt{\colorbox{codegray}{#1}}}}
+
+\newcommand{\gorilla}[1]{{\small\texttt{\colorbox{gorilla_red}{\textcolor{black}{\fontfamily{ptm}\selectfont \textit{#1}}}}}}
+
+
+\usepackage{datatool}
+\usepackage{ifthen}
+
+% Load the CSV file
+%\DTLloaddb{chunknums}{scripts/chunk-num_lister.csv}
+
+% Define a command to look up content
+%\newcommand{\liner}[1]{%
+%  \DTLforeach{chunk_nums}{\col1=content_cleaned, \col2=Line}{%
+%    \ifthenelse{\equal{#1}{\col1}}{\col2}{}%
+%  }%
+%}
+
+%\newcommand{\getValue}[1]{%
+%  \DTLforeach{chunk-num}{\ColumnOne=content_cleaned,\ColumnTwo=Line}{%
+%    \ifthenelse{\equal{\ColumnOne}{#1}}{%
+%      \edef\storedValue{\ColumnTwo}%
+%    }{%
+%      \typeout{No match for #1 in \ColumnOne}%
+%    }%
+%  }%
+%}
+
+% Define the command to get the value
+
+%\usepackage{titlesec}
+
+%\titleformat{\section}
+%  {\normalfont\Roman\Big\bfseries\color{black}}
+%  {\thesection}
+%  {1em}
+%  {\thesection\hspace{0.6em}}
+%\titleformat{\subsection}
+%  {\normalfont\Roman\Big\it\color{black}}
+%  {\thesubsection}
+%  {1em}
+%  {}
+%\titleformat{\subsubsection}
+%  {\normalfont\Roman\Big\it\color{black}}
+%  {\thesubsubsection}
+%  {1em}
+%  {}
+\title{} % Needed for \maketitle to work
+\shorttitle{FiREE Replication Framework}
+\author{} % Leave empty if desired
+\affiliation{} % Leave empty to avoid formatting issues
+
+% Suppress the visual display of the title block
+\title{} % Needed for \maketitle to compile
+\shorttitle{FiREE Replication Framework} 
+\author{}
+\affiliation{}
+
+% Suppress the visual output of \maketitle
+\makeatletter
+\renewcommand{\@maketitle}{\relax}
+\makeatother
+
+\setlength{\parindent}{30pt}
+\setlength{\parskip}{0pt plus 1pt}
+
+% Title
 \begin{document}
 
-\title[Article Title]{Focus (on) Replication: The Fidelity, Refinement, and Exploratory Extension (FiREE) Replication Framework}
+% Your custom title page
+\begin{titlepage}
+\centering
+\vspace*{1cm}
 
-\definecolor{VerbFocus}{HTML}{FF6F00} % Blue
-\definecolor{ObjectFocus}{HTML}{0D47A1} % Orange
+{\LARGE \bfseries Focus (on) Replication: Focus Processing in L1 and L2 English using the Fidelity, Refinement, and Exploratory Extension (FiREE) Replication Framework \par}
 
-\definecolor{dutch}{HTML}{000000} % Black
-\definecolor{english}{HTML}{CCCCCC} % Light Grey
+\vspace{1.5cm}
 
-\definecolor{object_stressed_competitor}{RGB}{157, 0, 255} % Purple
-\definecolor{verb_stressed_competitor}{HTML}{FFFF33} % Yellow
+{\large Adam A. Bramlett\textsuperscript{*} and Seth Wiener\textsuperscript{*,†} \par}
 
-\definecolor{Dur}{HTML}{E63946} % Red
-\definecolor{Formants}{HTML}{2A9D8F} % Teal
-\definecolor{Pitch}{HTML}{F4A261} % Orange
-\definecolor{Risetime}{HTML}{264653} % Dark Teal
-\definecolor{Lextale}{HTML}{BC5090} % Pink
-\definecolor{WorkingMemory}{gray}{0.5} % Grey
-\definecolor{DriftRate}{HTML}{FFA600} % Yellow-Orange
-\definecolor{Melody}{HTML}{003F5C} % Dark Blue
-\definecolor{Beat}{HTML}{FF6361} % Coral Red
+\vspace{1em}
 
+\makebox[0.9\textwidth][c]{%
+\parbox{0.9\textwidth}{%
+\centering
+\textsuperscript{*}Department of Languages, Cultures, and Applied Linguistics,\\
+Carnegie Mellon University, 341 Posner Hall, Pittsburgh, PA 15213, USA
+}}
 
+\vspace{1em}
 
-%%=============================================================%%
-%% GivenName	-> \fnm{Joergen W.}
-%% Particle	-> \spfx{van der} -> surname prefix
-%% FamilyName	-> \sur{Ploeg}
-%% Suffix	-> \sfx{IV}
-%% \author*[1,2]{\fnm{Joergen W.} \spfx{van der} \sur{Ploeg} 
-%%  \sfx{IV}}\email{iauthor@gmail.com}
-%%=============================================================%%
+{\small †Corresponding author: \href{mailto:sethw1@cmu.edu}{sethw1@cmu.edu} \par}
 
-\author[1]{\fnm{Adam A.} \sur{Bramlett}~(\href{https://orcid.org/0000-0001-6158-4327}{0000-0001-6158-4327})}
-\author*[1]{\fnm{Seth} \sur{Wiener}~(\href{https://orcid.org/0000-0002-7383-3682}{0000-0002-7383-3682})}\email{sethw1@cmu.edu}
+\vspace{1.5cm}
 
+\section*{Declarations of Interests}
+\noindent The authors declare no financial support or conflicts of interest. Experimental materials, unidentifiable data, and code are openly available and shared through the Open Science Framework at: \url{https://osf.io/wa4gv/?view_only=de113dbced6b46fab96ca8217b3c1ca6}
 
+\vspace{1cm}
 
-%\equalcont{These authors contributed equally to this work.}
+\section*{Acknowledgments}
+\noindent The authors would like to thank the authors of \cite{ge2021a} for both sharing their materials and their original contribution to our understanding of L1 and L2 focus processing.
 
-\affil*[1]{\orgdiv{Department of Languages, Cultures \& Applied Linguistics}, \orgname{Carnegie Mellon University}, \city{Pittsburgh}, \state{PA}, \country{U.S.A}}
+\end{titlepage}
 
 
-
-
-%%==================================%%
-%% Sample for unstructured abstract %%
-%%==================================%%
-
-\abstract{\subfile{paper/2-abstract}}
-
-%%================================%%
-%% Sample for structured abstract %%
-%%================================%%
-
-\keywords{Eye-tracking, replication, individual differences, focus processing, psycholinguistics}
-
-%%\pacs[JEL Classification]{D8, H51}
-
-%%\pacs[MSC Classification]{35A01, 65L10, 65L12, 65L20, 65L70}
-
-
-
-
-\maketitle
-\section{Introduction}\label{sec1}
+% Now your normal content
+\subfile{paper/2-abstract}
 \subfile{paper/3-introduction}
-
-\section{Methods}\label{sec2}
 \subfile{paper/4-methods}
-
-\section{Results}\label{sec3}
 \subfile{paper/5-results}
-
-\section{Discussion}\label{sec4}
+%\subfile{paper/5-extension_results}
 \subfile{paper/6-discussion}
-
-\section{Conclusion}\label{sec5}
 \subfile{paper/7-conclusion}
+%\subfile{outline}
 
-\section*{Statements and Declarations}
+% sections are done with \section, \subsection and \subsubsection.
+% for more information, see https://ctan.math.illinois.edu/macros/latex/contrib/apa7/apa7.pdf
 
-The authors declare no financial support or conflicts of interest. Experimental materials, unidentifiable-data, and code are openly available and shared through the Open Science Framework at: $https://osf.io/tfc8r/?view_only=085713b90a994403b25c31883f6cdccd $
-
-\noindent
-
-
-%%===================================================%%
-%% For presentation purpose, we have included        %%
-%% \bigskip command. Please ignore this.             %%
-%%===================================================%%
-
-%%===========================================================================================%%
-%% If you are submitting to one of the Nature Portfolio journals, using the eJP submission   %%
-%% system, please include the references within the manuscript file itself. You may do this  %%
-%% by copying the reference list from your .bbl file, paste it into the main manuscript .tex %%
-%% file, and delete the associated \verb+\bibliography+ commands.                            %%
-%%===========================================================================================%%
-\bibliography{paper/my_bib}% common bib file
-
-
+\printbibliography
+% include all sources in references.bib
+% cite sources in text with \autocite, or:
+% \parencite for "(Author, 2023)"
+% \textcite for "Author (2023)"
 \end{document}

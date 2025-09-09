@@ -6,7 +6,10 @@
 % Documentlass can be stu (student), doc (document), jou (journal), or man (manuscript)
 % Use stu for Course papers
 \documentclass[man, floatsintext, letterpaper, 12pt, donotrepeattitle]{apa7}
-\usepackage[style=apa, backend=biber]{biblatex}
+\usepackage[style=apa, 
+backend=biber,
+maxcitenames=1,
+uniquelist=false]{biblatex}
 \addbibresource{my_bib.bib}
 \usepackage[american]{babel}
 

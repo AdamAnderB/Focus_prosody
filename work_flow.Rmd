@@ -1427,7 +1427,7 @@ plots <- lapply(unique(ind_diff_raw_longer2$cog_measures), function(measure) {
                labeller = as_labeller(cog_measure_labels), switch = "y") +  
 
     scale_fill_manual(values = c("dutch" = "black", "english" = "grey80"),  
-                    labels = c("dutch" = "Dutch", "english" = "English")) +  
+                    labels = c("dutch" = "L1 Dutch - L2 Dutch", "english" = "L1 English")) +  
     scale_color_manual(values = c("black", "grey80"), guide = "none") +
 
     labs(x = NULL, y = NULL) + 
@@ -1439,7 +1439,8 @@ library(patchwork)
 cog_measures_plot <- wrap_plots(plots, ncol = 1) + 
   plot_layout(guides = "collect") &  
   theme(legend.position = "bottom",  
-        legend.title = element_blank())  
+        legend.title = element_blank(),
+        legend.direction = "vertical")  
 
 cog_measures_plot+
   scale_fill_manual(values = category_colors)
@@ -1458,7 +1459,7 @@ p1<-ggplot(ind_diff_acoust_longer3, aes(
 
   geom_hline(yintercept = 0, color = "white", linewidth = 16)+
   geom_hline(yintercept = 21, color = "white", linewidth = 11)+
-  geom_hline(yintercept = 25, color = "white", linewidth = 10)+
+  geom_hline(yintercept = 26, color = "white", linewidth = 12)+
   geom_hline(yintercept = 31, color = "white", linewidth = 10)+
   geom_hline(yintercept = 18, color = "black", linewidth = .5)+
   geom_hline(yintercept = 26, color = "black", linewidth = .5)+
@@ -1632,13 +1633,13 @@ p1<-ggplot(ind_diff_acoust_longer3, aes(
             color = "black",
             angle = 45)+
   geom_text(aes(x = num_new_rows/2, 
-                y = 42, 
-                label = "Dutch"), 
+                y = 41, 
+                label = "L1 Dutch - L2 English"), 
             color = "white",
             angle = -45)+
   geom_text(aes(x = num_new_rows*2, 
-                y = 42, 
-                label = "English"), 
+                y = 41, 
+                label = "L1 English"), 
             color = "black",
             angle = 0)+
   geom_text(aes(x = num_new_rows/2*7, 
@@ -1701,7 +1702,7 @@ plot1 <- ggplot(lang_back_simple, aes(x = interaction(in_person,exp), y = as.num
   geom_boxplot(width = 0.1, alpha = 0.7, color = "white", outlier.shape = NA) +
   theme_minimal() +
   theme(legend.position = "none") +
-  labs(x = "location and Experimental Group", y = "Age") +
+  labs(x = "Location and Experimental Group", y = "Age") +
   scale_x_discrete(labels = function(x) {
     x <- gsub("dutch", "Dutch", x)
     x <- gsub("english", "English", x)
@@ -1837,8 +1838,10 @@ ge_data<-ge_list_data_c%>%
            x_pred_normalised >= 0 & y_pred_normalised <= 0 ~ "3" ))
 
 nrow(ge_data)/nrow(ge_et_data)
-ge_data%>%ggplot(aes(x=x_pred_normalised,y=y_pred_normalised,color=quadrant))+
-  geom_point()
+ge_data%>%
+  ggplot(aes(x=x_pred_normalised,y=y_pred_normalised,color=quadrant))+
+  geom_point()+
+  theme_minimal()
 ```
 
 ```{r}
@@ -2060,6 +2063,8 @@ all_fixations <- all_fixations %>%
 
 dutch_fix<-all_fixations %>%
   filter(experiment_group == "Dutch") %>%
+  mutate(experiment_group = ifelse(experiment_group=="Dutch",
+                                   "L1 Dutch - L2 English","L1 English"))%>%
   ggplot(aes(x = time_cats_words, y = fixation_proportion, group = interaction(condition, experiment_group))) +
   geom_line(color = "black", linewidth=1, alpha=.5, show.legend = FALSE) +
   geom_point(aes(shape = experiment_group), color = "white", size=2) +
@@ -2091,6 +2096,8 @@ dutch_fix<-all_fixations %>%
 
 english_fix<-all_fixations %>%
   filter(experiment_group != "Dutch") %>%
+  mutate(experiment_group = ifelse(experiment_group=="Dutch",
+                                   "L1 Dutch - L2 English","L1 English"))%>%
   ggplot(aes(x = time_cats_words, y = fixation_proportion, group = interaction(condition, experiment_group))) +
   geom_line(color = "grey80", linewidth=1, alpha=.5, show.legend = FALSE) +
   geom_point(aes(shape = experiment_group), color = "white", size=2) +
@@ -2120,6 +2127,7 @@ english_fix<-all_fixations %>%
        linetype = guide_legend(title = "Language:"))
 
 english_fix
+dutch_fix
 ggsave("viz/dutch_fix.png", dutch_fix, width = 10, height = 6, dpi = 300)
 ggsave("viz/english_fix.png", english_fix, width = 10, height = 6, dpi = 300)
 ```
@@ -2128,6 +2136,8 @@ ggsave("viz/english_fix.png", english_fix, width = 10, height = 6, dpi = 300)
 
 dutch_fix2<-all_fixations %>%
   filter(experiment_group == "Dutch") %>%
+  mutate(experiment_group = ifelse(experiment_group=="Dutch",
+                                   "L1 Dutch - L2 English","L1 English"))%>%
   ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category, whos))) +
   
   geom_smooth(fill = "black") +
@@ -2143,7 +2153,7 @@ dutch_fix2<-all_fixations %>%
   theme_minimal() +
   theme(legend.position = "top",
         axis.text.x = element_text(angle = 90, hjust = 1)) +
-  labs(title = "English",
+  labs(title = "L1 Dutch - L2 English",
        x = "",
        y = "Fixation proportions") +
   scale_color_manual(values = c("#39FF14", "#9D00FF", "#FFFF33","#FF10F0"),
@@ -2155,6 +2165,8 @@ dutch_fix2<-all_fixations %>%
 
 english_fix2<-all_fixations %>%
   filter(experiment_group != "Dutch") %>%
+  mutate(experiment_group = ifelse(experiment_group=="Dutch",
+                                   "L1 Dutch - L2 English","L1 English"))%>%
   ggplot(aes(x = time_cats_words, y = fixation_proportion, color = category, group = interaction(category, whos))) +
   
   geom_smooth(fill = "grey80") +
@@ -2170,7 +2182,7 @@ english_fix2<-all_fixations %>%
   theme_minimal() +
   theme(legend.position = "top",
         axis.text.x = element_text(angle = 90, hjust = 1)) +
-  labs(title = "English",
+  labs(title = "L1 English",
        x = "",
        y = "Fixation proportions") +
   scale_color_manual(values = c("#39FF14", "#9D00FF", "#FFFF33","#FF10F0"),
@@ -2447,7 +2459,7 @@ model_plot_dutch <- all_model_Data_viz %>%
   geom_point(size = 3, alpha = 0.7) +
   geom_errorbar(aes(ymin = estimate - std.error, ymax = estimate + std.error), width = 0.2, alpha = 0.7) +
   geom_text(aes(label = sig_level), vjust = -1, size = 4, color = "black") +
-  labs(title = "Model Output Dutch",
+  labs(title = "Model Output L1 English - L2 Dutch",
        x = "Predictor Terms", 
        y = "Estimate", 
        color = "Effect Type") +
@@ -2469,7 +2481,7 @@ model_plot_english <- all_model_Data_viz %>%
   geom_point(size = 3, alpha = 0.7) +
   geom_errorbar(aes(ymin = estimate - 1.96 *std.error, ymax = estimate + 1.96 *std.error), width = 0.2, alpha = 0.7) +
   geom_text(aes(label = sig_level), vjust = -1, size = 4, color = "black") +
-  labs(title = "Model Output English",
+  labs(title = "Model Output L1 English",
        x = "Predictor Terms", 
        y = "Estimate", 
        color = "Effect Type") +
@@ -2785,8 +2797,6 @@ write.csv(all_best_fixed_effects, file = "../data/gam_models.csv", row.names = F
 #individual differences
 
 ```{r}
-View(ind_diff_simp)
-
 scale_column <- function(x) {
   mean_x <- mean(x, na.rm = TRUE)
   max_abs_x <- max(abs(x - mean_x), na.rm = TRUE)
@@ -2840,6 +2850,13 @@ competitor_id<- id_stats %>%
 competitor_id_0<-competitor_id %>%filter(sentence_phase==0)
 competitor_id_1<-competitor_id %>%filter(sentence_phase==1)
 
+
+if (!dir.exists("data")) {
+  dir.create("data")
+}
+
+# Save the dataset as a CSV file
+write.csv(id_stats, file = "data/full_data.csv", row.names = FALSE)
 ```
 
 
@@ -3020,7 +3037,6 @@ id_gam_mod_out<-ggplot(id_gam, aes(x = term, y = estimate, color = color)) +
 
 id_gam_mod_out
 ggsave("viz/id_gam_mod_out.png", id_gam_mod_out, width = 12, height = 6, dpi = 300)
-
 
 write.csv(id_gam, file = "../data/id_gam_models.csv", row.names = FALSE)
 ```

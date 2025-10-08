@@ -1116,6 +1116,7 @@ save_ddm_model(ddm_model_10)
 
 # Load the most recent model into ddm_model
 ddm_model <- load_ddm_model()
+#ddm_model <- readRDS("../ddm_output_1.rds")
 
 drift_rates <- ranef(ddm_model)$participant.private.id[, , "Intercept"]
 
@@ -1138,7 +1139,6 @@ flanker_simp<-drift_rates_df%>%
 
 drift_comp%>%ggplot(aes(x=drift_rate,y=acc))+
   geom_point()
-R.version.string
 ```
 
 participant removal
@@ -1169,7 +1169,6 @@ agg_removal<-part_keep_rem_agg%>%
 write.csv(part_keep_rem_agg_lang_stand, "part_keep.csv", row.names = FALSE)
 write.csv(agg_removal, "agg_part_keep.csv", row.names = FALSE)
 write.csv(part_keep_rem_agg, "part_keep_rem_agg.csv", row.names = FALSE)
-View(part_keep_rem_agg)
 ```
 
 cronbachs
@@ -1941,7 +1940,6 @@ ge_data_mapped_clean<-ge_data_mapped%>%
       TRUE ~ NA_character_),
     time_cats_words = factor(time_cats_words, levels = unique(time_cats_words)))
 
-View(ge_data_mapped_clean)
 frame_rate<-ge_data_mapped_clean%>%
   group_by(participant.private.id,object)%>%
   summarize(max_time=max(time),
@@ -1951,7 +1949,28 @@ frame_rate<-ge_data_mapped_clean%>%
   mutate(fr=count/length)
 
 
-frame_rate%>%ggplot(aes(x=participant.private.id,y=fr))+geom_point()+geom_violin()
+fr_viz<-frame_rate %>%
+  filter(is.finite(fr), fr > 0)%>%
+  ggplot(aes(x = reorder(as.numeric(participant.private.id), fr, FUN = mean), y = fr)) +
+  geom_hline(yintercept = mean(frame_rate$fr[is.finite(frame_rate$fr) & frame_rate$fr > 0]),
+             color = "blue", linetype = "solid", size = 1) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = 0, ymax = 5),
+            fill = "grey90", alpha = 0.5, inherit.aes = FALSE) +
+  geom_violin(fill = "grey80", color = "grey50") +
+  geom_point(alpha = 0.4, size = 1, color = "black") +
+  stat_summary(fun = mean, geom = "point", 
+               color = "red", size = 3) +
+  labs(
+    x = "Participant ID",
+    y = "Frame rate (Hz)",
+    title = "Distribution of Frame Rates by Participant") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1))
+
+fr_viz
+ggsave("viz/fr.png", fr_viz, width = 10, height = 5, dpi = 300)
+
 ```
 
 ```{r}

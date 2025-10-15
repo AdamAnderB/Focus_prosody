@@ -3,6 +3,9 @@
 ## *Reference:*  
 **Bramlett, A. A. & Wiener, S. (2024).** *Focus (on) Replication: The Fidelity, Refinement, and Exploratory Extension (FiREE) Replication Framework*. *[Journal Name]*.
 
+## *The Paper:*
+[https://psycnet.apa.org/record/2025-80133-001](https://psycnet.apa.org/record/2025-80133-001)
+
 ## Additional Resources  
 For further details and resources related to this project, please visit the following link:  
 [Open Science Framework - Project Repository](https://osf.io/wa4gv/?view_only=de113dbced6b46fab96ca8217b3c1ca6)
